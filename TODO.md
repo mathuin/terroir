@@ -10,13 +10,21 @@ Development task list
   - [ ] Write level.dat and test
   - [ ] Random access to blocks and data in world
   - [ ] Double-check test coverage!
-- [ ] Design "the hard part" (i.e., making the biome map)
-  - [ ] Ocean/plains
-  - [ ] Deep ocean (plus bathy!)
-  - [ ] Add forests and deserts
-  - [ ] Buildings on developed land?  Villages?
-  - [ ] Crops on croplands?
-  - [ ] Beaches!
+- [ ] Write map generation package including biome map
+  - [ ] Import landcover data into map
+  - [ ] Generate crust array
+  - [ ] Biome map: ocean/plains!
+  - [ ] Generate bathy array
+  - [ ] Biome map: deep ocean
+  - [ ] Import elevation data into map
+  - [ ] Biome map: Hills and Extreme hills
+- [ ] Additional biome map features
+  - [ ] Forests
+  - [ ] Deserts
+  - [ ] Developed land (buildings?  stone?)
+  - [ ] Croplands
+  - [ ] Beaches
+  - [ ] What else?
 - [ ] Translate biome and other maps into Minecraft world
   - [ ] One goroutine per chunk?  column?  region?  world?
 - [ ] Build Docker container for project
