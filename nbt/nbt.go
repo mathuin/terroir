@@ -74,13 +74,11 @@ func ReadTag(r io.Reader) (t Tag, err error) {
 	t.Type = ttype[0]
 
 	// Now about that name
-	lenbytes := make([]byte, 2)
-	_, err = io.ReadFull(r, lenbytes)
+	var strlen int16
+	err = binary.Read(r, binary.BigEndian, &strlen)
 	if err != nil {
 		return
 	}
-
-	strlen := int(lenbytes[0])*256 + int(lenbytes[1])
 
 	strbytes := make([]byte, strlen)
 
@@ -100,12 +98,74 @@ func ReadTag(r io.Reader) (t Tag, err error) {
 			return
 		}
 		t.Payload = payload
+	case TAG_Short:
+		var payload int16
+		err = binary.Read(r, binary.BigEndian, &payload)
+		if err != nil {
+			return
+		}
+		t.Payload = payload
 	case TAG_Int:
 		var payload int32
 		err = binary.Read(r, binary.BigEndian, &payload)
 		if err != nil {
 			return
 		}
+		t.Payload = payload
+	case TAG_Long:
+		var payload int64
+		err = binary.Read(r, binary.BigEndian, &payload)
+		if err != nil {
+			return
+		}
+		t.Payload = payload
+	case TAG_Float:
+		var payload float32
+		err = binary.Read(r, binary.BigEndian, &payload)
+		if err != nil {
+			return
+		}
+		t.Payload = payload
+	case TAG_Double:
+		var payload float64
+		err = binary.Read(r, binary.BigEndian, &payload)
+		if err != nil {
+			return
+		}
+		t.Payload = payload
+	case TAG_Byte_Array:
+		var strlen int32
+		err = binary.Read(r, binary.BigEndian, &strlen)
+		if err != nil {
+			return
+		}
+
+		strbytes := make([]byte, strlen)
+
+		_, err = io.ReadFull(r, strbytes)
+		if err != nil {
+			return
+		}
+
+		t.Payload = strbytes
+	case TAG_String:
+		var strlen int16
+		err = binary.Read(r, binary.BigEndian, &strlen)
+		if err != nil {
+			return
+		}
+
+		strbytes := make([]byte, strlen)
+
+		_, err = io.ReadFull(r, strbytes)
+		if err != nil {
+			return
+		}
+
+		t.Payload = string(strbytes)
+	case TAG_List:
+		// JMT: this is a little annoying.
+		var payload int
 		t.Payload = payload
 	case TAG_Compound:
 		payload := []Tag{}
@@ -114,6 +174,22 @@ func ReadTag(r io.Reader) (t Tag, err error) {
 			payload = append(payload, newtag)
 		}
 		t.Payload = payload
+	case TAG_Int_Array:
+		var strlen int32
+		err = binary.Read(r, binary.BigEndian, &strlen)
+		if err != nil {
+			return
+		}
+
+		ints := make([]int32, strlen)
+		for key := range ints {
+			err = binary.Read(r, binary.BigEndian, &ints[key])
+			if err != nil {
+				return
+			}
+		}
+
+		t.Payload = ints
 	default:
 		err = fmt.Errorf("unknown tag")
 	}
@@ -135,13 +211,36 @@ func WriteTag(w io.Writer, t Tag) (err error) {
 	switch t.Type {
 	case TAG_Byte:
 		w.Write(t.Payload.([]byte))
+	case TAG_Short:
+		binary.Write(w, binary.BigEndian, t.Payload.(int16))
 	case TAG_Int:
 		binary.Write(w, binary.BigEndian, t.Payload.(int32))
+	case TAG_Long:
+		binary.Write(w, binary.BigEndian, t.Payload.(int64))
+	case TAG_Float:
+		binary.Write(w, binary.BigEndian, t.Payload.(float32))
+	case TAG_Double:
+		binary.Write(w, binary.BigEndian, t.Payload.(float64))
+	case TAG_Byte_Array:
+		binary.Write(w, binary.BigEndian, int32(len(t.Payload.([]byte))))
+		for _, value := range t.Payload.([]byte) {
+			binary.Write(w, binary.BigEndian, value)
+		}
+	case TAG_String:
+		binary.Write(w, binary.BigEndian, int16(len(t.Payload.(string))))
+		w.Write([]byte(t.Payload.(string)))
+	case TAG_List:
 	case TAG_Compound:
 		tags := append(t.Payload.([]Tag), Tag{Type: TAG_End})
 		for _, tag := range tags {
 			WriteTag(w, tag)
 		}
+	case TAG_Int_Array:
+		binary.Write(w, binary.BigEndian, int32(len(t.Payload.([]int32))))
+		for _, value := range t.Payload.([]int32) {
+			binary.Write(w, binary.BigEndian, value)
+		}
+
 	default:
 		err = fmt.Errorf("unknown tag")
 	}
