@@ -1,6 +1,7 @@
 package nbt
 
 import (
+	"bytes"
 	"encoding/binary"
 	"fmt"
 	"io"
@@ -165,15 +166,9 @@ var Tags = map[byte]struct {
 		},
 	},
 	TAG_List: {"TAG_List",
-		func(r io.Reader) (interface{}, error) {
-			var i interface{}
-			var err error
-			return i, err
-		},
-		func(w io.Writer, i interface{}) error {
-			var err error
-			return err
-		},
+		// JMT: figure out how to break loop
+		nil,
+		nil,
 	},
 	TAG_Compound: {"TAG_Compound",
 		// JMT: figure out how to break loop
@@ -235,6 +230,256 @@ func writeCompound(w io.Writer, i interface{}) error {
 	return nil
 }
 
+// same for the list
+
+func readList(r io.Reader) (i interface{}, err error) {
+	var tsubi interface{}
+	if tsubi, err = Tags[TAG_Byte].PReader(r); err != nil {
+		return
+	}
+	tsub := tsubi.(byte)
+	var tleni interface{}
+	if tleni, err = Tags[TAG_Int].PReader(r); err != nil {
+		return
+	}
+	tlen := int(tleni.(int32))
+	switch tsub {
+	case TAG_Byte:
+		// JMT: so much duplicated code!
+		iarr := make([]byte, tlen)
+		var iarrj interface{}
+		for j := 0; j < tlen; j++ {
+			if iarrj, err = Tags[tsub].PReader(r); err != nil {
+				return
+			}
+			iarr[j] = iarrj.(byte)
+		}
+		return iarr, nil
+	case TAG_Short:
+		// JMT: so much duplicated code!
+		iarr := make([]int16, tlen)
+		var iarrj interface{}
+		for j := 0; j < tlen; j++ {
+			if iarrj, err = Tags[tsub].PReader(r); err != nil {
+				return
+			}
+			iarr[j] = iarrj.(int16)
+		}
+		return iarr, nil
+	case TAG_Int:
+		// JMT: so much duplicated code!
+		iarr := make([]int32, tlen)
+		var iarrj interface{}
+		for j := 0; j < tlen; j++ {
+			if iarrj, err = Tags[tsub].PReader(r); err != nil {
+				return
+			}
+			iarr[j] = iarrj.(int32)
+		}
+		return iarr, nil
+	case TAG_Long:
+		// JMT: so much duplicated code!
+		iarr := make([]int64, tlen)
+		var iarrj interface{}
+		for j := 0; j < tlen; j++ {
+			if iarrj, err = Tags[tsub].PReader(r); err != nil {
+				return
+			}
+			iarr[j] = iarrj.(int64)
+		}
+		return iarr, nil
+	case TAG_Float:
+		// JMT: so much duplicated code!
+		iarr := make([]float32, tlen)
+		var iarrj interface{}
+		for j := 0; j < tlen; j++ {
+			if iarrj, err = Tags[tsub].PReader(r); err != nil {
+				return
+			}
+			iarr[j] = iarrj.(float32)
+		}
+		return iarr, nil
+	case TAG_Double:
+		// JMT: so much duplicated code!
+		iarr := make([]float64, tlen)
+		var iarrj interface{}
+		for j := 0; j < tlen; j++ {
+			if iarrj, err = Tags[tsub].PReader(r); err != nil {
+				return
+			}
+			iarr[j] = iarrj.(float64)
+		}
+		return iarr, nil
+	case TAG_Byte_Array:
+		// JMT: so much duplicated code!
+		iarr := make([][]byte, tlen)
+		var iarrj interface{}
+		for j := 0; j < tlen; j++ {
+			if iarrj, err = Tags[tsub].PReader(r); err != nil {
+				return
+			}
+			iarr[j] = iarrj.([]byte)
+		}
+		return iarr, nil
+	case TAG_String:
+		// JMT: so much duplicated code!
+		iarr := make([]string, tlen)
+		var iarrj interface{}
+		for j := 0; j < tlen; j++ {
+			if iarrj, err = Tags[tsub].PReader(r); err != nil {
+				return
+			}
+			iarr[j] = iarrj.(string)
+		}
+		return iarr, nil
+	case TAG_List:
+		// JMT: so much duplicated code!
+		iarr := make([][]interface{}, tlen)
+		var iarrj interface{}
+		for j := 0; j < tlen; j++ {
+			if iarrj, err = readList(r); err != nil {
+				return
+			}
+			iarr[j] = iarrj.([]interface{})
+		}
+		return iarr, nil
+	case TAG_Compound:
+		// JMT: so much duplicated code!
+		iarr := make([][]Tag, tlen)
+		var iarrj interface{}
+		for j := 0; j < tlen; j++ {
+			if iarrj, err = readCompound(r); err != nil {
+				return
+			}
+			iarr[j] = iarrj.([]Tag)
+		}
+		return iarr, nil
+	case TAG_Int_Array:
+		// JMT: so much duplicated code!
+		iarr := make([][]int32, tlen)
+		var iarrj interface{}
+		for j := 0; j < tlen; j++ {
+			if iarrj, err = Tags[tsub].PReader(r); err != nil {
+				return
+			}
+			iarr[j] = iarrj.([]int32)
+		}
+		return iarr, nil
+	}
+	return
+}
+
+func writeList(w io.Writer, i interface{}) error {
+	var tsub byte
+	var tlen int32
+	var tout bytes.Buffer
+	switch arr := i.(type) {
+	case []byte:
+		// JMT: why must this code be repeated
+		tsub = TAG_Byte
+		tlen = int32(len(arr))
+		for _, value := range arr {
+			if err := Tags[tsub].PWriter(&tout, value); err != nil {
+				return err
+			}
+		}
+	case []int16:
+		// JMT: why must this code be repeated
+		tsub = TAG_Short
+		tlen = int32(len(arr))
+		for _, value := range arr {
+			if err := Tags[tsub].PWriter(&tout, value); err != nil {
+				return err
+			}
+		}
+	case []int32:
+		// JMT: why must this code be repeated
+		tsub = TAG_Int
+		tlen = int32(len(arr))
+		for _, value := range arr {
+			if err := Tags[tsub].PWriter(&tout, value); err != nil {
+				return err
+			}
+		}
+	case []int64:
+		// JMT: why must this code be repeated
+		tsub = TAG_Long
+		tlen = int32(len(arr))
+		for _, value := range arr {
+			if err := Tags[tsub].PWriter(&tout, value); err != nil {
+				return err
+			}
+		}
+	case []float32:
+		// JMT: why must this code be repeated
+		tsub = TAG_Float
+		tlen = int32(len(arr))
+		for _, value := range arr {
+			if err := Tags[tsub].PWriter(&tout, value); err != nil {
+				return err
+			}
+		}
+	case []float64:
+		// JMT: why must this code be repeated
+		tsub = TAG_Double
+		tlen = int32(len(arr))
+		for _, value := range arr {
+			if err := Tags[tsub].PWriter(&tout, value); err != nil {
+				return err
+			}
+		}
+	case [][]byte:
+		// JMT: why must this code be repeated
+		tsub = TAG_Byte_Array
+		tlen = int32(len(arr))
+		for _, value := range arr {
+			if err := Tags[tsub].PWriter(&tout, value); err != nil {
+				return err
+			}
+		}
+	case []string:
+		// JMT: why must this code be repeated
+		tsub = TAG_String
+		tlen = int32(len(arr))
+		for _, value := range arr {
+			if err := Tags[tsub].PWriter(&tout, value); err != nil {
+				return err
+			}
+		}
+	case []interface{}:
+		// JMT: why must this code be repeated
+		tsub = TAG_List
+		tlen = int32(len(arr))
+		for _, value := range arr {
+			if err := writeList(&tout, value); err != nil {
+				return err
+			}
+		}
+	case [][]Tag:
+		// JMT: why must this code be repeated
+		tsub = TAG_Compound
+		tlen = int32(len(arr))
+		for _, value := range arr {
+			if err := writeCompound(&tout, value); err != nil {
+				return err
+			}
+		}
+	case [][]int32:
+		// JMT: why must this code be repeated
+		tsub = TAG_Int_Array
+		tlen = int32(len(arr))
+		for _, value := range arr {
+			if err := Tags[tsub].PWriter(&tout, value); err != nil {
+				return err
+			}
+		}
+	}
+	Tags[TAG_Byte].PWriter(w, tsub)
+	Tags[TAG_Int].PWriter(w, tlen)
+	tout.WriteTo(w)
+	return nil
+}
+
 func ReadTag(r io.Reader) (t Tag, err error) {
 	// read a byte
 	var ttypei, tnamei interface{}
@@ -256,16 +501,23 @@ func ReadTag(r io.Reader) (t Tag, err error) {
 
 	// Putting this in the widget causes an initialization loop issue
 	// (Tags refers to readCompound refers to ReadTag refers to Tags)
-	if ttype == TAG_Compound {
+	switch ttype {
+	case TAG_List:
+		if payload, err := readList(r); err == nil {
+			t = Tag{Type: ttype, Name: tname, Payload: payload}
+		}
+	case TAG_Compound:
 		if payload, err := readCompound(r); err == nil {
 			t = Tag{Type: ttype, Name: tname, Payload: payload}
 		}
-	} else if val, ok := Tags[ttype]; ok {
-		if payload, err := val.PReader(r); err == nil {
-			t = Tag{Type: ttype, Name: tname, Payload: payload}
+	default:
+		if val, ok := Tags[ttype]; ok {
+			if payload, err := val.PReader(r); err == nil {
+				t = Tag{Type: ttype, Name: tname, Payload: payload}
+			}
+		} else {
+			err = fmt.Errorf("unknown tag")
 		}
-	} else {
-		err = fmt.Errorf("unknown tag")
 	}
 	return
 }
@@ -280,12 +532,17 @@ func WriteTag(w io.Writer, t Tag) (err error) {
 	Tags[TAG_String].PWriter(w, t.Name)
 
 	// JMT: initialization loop issue here too
-	if t.Type == TAG_Compound {
+	switch t.Type {
+	case TAG_List:
+		err = writeList(w, t.Payload)
+	case TAG_Compound:
 		err = writeCompound(w, t.Payload)
-	} else if val, ok := Tags[t.Type]; ok {
-		err = val.PWriter(w, t.Payload)
-	} else {
-		err = fmt.Errorf("unknown tag")
+	default:
+		if val, ok := Tags[t.Type]; ok {
+			err = val.PWriter(w, t.Payload)
+		} else {
+			err = fmt.Errorf("unknown tag")
+		}
 	}
 	return
 }
