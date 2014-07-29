@@ -7,49 +7,19 @@ import (
 )
 
 const (
-	TAG_End = iota
-	TAG_Byte
-	TAG_Short
-	TAG_Int
-	TAG_Long
-	TAG_Float
-	TAG_Double
-	TAG_Byte_Array
-	TAG_String
-	TAG_List
-	TAG_Compound
-	TAG_Int_Array
+	TAG_End        byte = 0
+	TAG_Byte       byte = 1
+	TAG_Short      byte = 2
+	TAG_Int        byte = 3
+	TAG_Long       byte = 4
+	TAG_Float      byte = 5
+	TAG_Double     byte = 6
+	TAG_Byte_Array byte = 7
+	TAG_String     byte = 8
+	TAG_List       byte = 9
+	TAG_Compound   byte = 10
+	TAG_Int_Array  byte = 11
 )
-
-func tagToString(t byte) string {
-	switch t {
-	case TAG_End:
-		return "TAG_End"
-	case TAG_Byte:
-		return "TAG_Byte"
-	case TAG_Short:
-		return "TAG_Short"
-	case TAG_Int:
-		return "TAG_Int"
-	case TAG_Long:
-		return "TAG_Long"
-	case TAG_Float:
-		return "TAG_Float"
-	case TAG_Double:
-		return "TAG_Double"
-	case TAG_Byte_Array:
-		return "TAG_Byte_Array"
-	case TAG_String:
-		return "TAG_String"
-	case TAG_List:
-		return "TAG_List"
-	case TAG_Compound:
-		return "TAG_Compound"
-	case TAG_Int_Array:
-		return "TAG_Int_Array"
-	}
-	return "Unknown tag!"
-}
 
 type Tag struct {
 	Type    byte
@@ -57,191 +27,237 @@ type Tag struct {
 	Payload interface{}
 }
 
+type PayloadReader func(io.Reader) interface{}
+type PayloadWriter func(io.Writer, interface{})
+
+var Tags = map[byte]struct {
+	String  string
+	PReader PayloadReader
+	PWriter PayloadWriter
+}{
+	TAG_End: {"TAG_End",
+		nil,
+		nil,
+	},
+	TAG_Byte: {"TAG_Byte",
+		func(r io.Reader) interface{} {
+			payload := make([]byte, 1)
+			if _, err := io.ReadFull(r, payload); err != nil {
+				panic(err)
+			}
+			return payload
+		},
+		func(w io.Writer, i interface{}) {
+			w.Write(i.([]byte))
+		},
+	},
+	TAG_Short: {"TAG_Short",
+		func(r io.Reader) interface{} {
+			var payload int16
+			if err := binary.Read(r, binary.BigEndian, &payload); err != nil {
+				panic(err)
+			}
+			return payload
+		},
+		func(w io.Writer, i interface{}) {
+			binary.Write(w, binary.BigEndian, i.(int16))
+		},
+	},
+	TAG_Int: {"TAG_Int",
+		func(r io.Reader) interface{} {
+			var payload int32
+			if err := binary.Read(r, binary.BigEndian, &payload); err != nil {
+				panic(err)
+			}
+			return payload
+		},
+		func(w io.Writer, i interface{}) {
+			binary.Write(w, binary.BigEndian, i.(int32))
+		},
+	},
+	TAG_Long: {"TAG_Long",
+		func(r io.Reader) interface{} {
+			var payload int64
+			if err := binary.Read(r, binary.BigEndian, &payload); err != nil {
+				panic(err)
+			}
+			return payload
+		},
+		func(w io.Writer, i interface{}) {
+			binary.Write(w, binary.BigEndian, i.(int64))
+		},
+	},
+	TAG_Float: {"TAG_Float",
+		func(r io.Reader) interface{} {
+			var payload float32
+			if err := binary.Read(r, binary.BigEndian, &payload); err != nil {
+				panic(err)
+			}
+			return payload
+		},
+		func(w io.Writer, i interface{}) {
+			binary.Write(w, binary.BigEndian, i.(float32))
+		},
+	},
+	TAG_Double: {"TAG_Double",
+		func(r io.Reader) interface{} {
+			var payload float64
+			if err := binary.Read(r, binary.BigEndian, &payload); err != nil {
+				panic(err)
+			}
+			return payload
+		},
+		func(w io.Writer, i interface{}) {
+			binary.Write(w, binary.BigEndian, i.(float64))
+		},
+	},
+	TAG_Byte_Array: {"TAG_Byte_Array",
+		func(r io.Reader) interface{} {
+			var strlen int32
+			if err := binary.Read(r, binary.BigEndian, &strlen); err != nil {
+				panic(err)
+			}
+
+			strbytes := make([]byte, strlen)
+
+			if _, err := io.ReadFull(r, strbytes); err != nil {
+				panic(err)
+			}
+
+			return strbytes
+		},
+		func(w io.Writer, i interface{}) {
+			binary.Write(w, binary.BigEndian, int32(len(i.([]byte))))
+			for _, value := range i.([]byte) {
+				binary.Write(w, binary.BigEndian, value)
+			}
+		},
+	},
+	TAG_String: {"TAG_String",
+		func(r io.Reader) interface{} {
+			var strlen int16
+			if err := binary.Read(r, binary.BigEndian, &strlen); err != nil {
+				panic(err)
+			}
+
+			strbytes := make([]byte, strlen)
+
+			if _, err := io.ReadFull(r, strbytes); err != nil {
+				panic(err)
+			}
+
+			return string(strbytes)
+		},
+		func(w io.Writer, i interface{}) {
+			binary.Write(w, binary.BigEndian, int16(len(i.(string))))
+			w.Write([]byte(i.(string)))
+		},
+	},
+	TAG_List: {"TAG_List",
+		func(r io.Reader) interface{} {
+			var i interface{}
+			return i
+		},
+		func(w io.Writer, i interface{}) {
+			return
+		},
+	},
+	TAG_Compound: {"TAG_Compound",
+		// JMT: figure out how to break loop
+		nil,
+		nil,
+	},
+	TAG_Int_Array: {"TAG_Int_Array",
+		func(r io.Reader) interface{} {
+			var strlen int32
+			if err := binary.Read(r, binary.BigEndian, &strlen); err != nil {
+				panic(err)
+			}
+
+			ints := make([]int32, strlen)
+			for key := range ints {
+				if err := binary.Read(r, binary.BigEndian, &ints[key]); err != nil {
+					panic(err)
+				}
+			}
+
+			return ints
+		},
+		func(w io.Writer, i interface{}) {
+			binary.Write(w, binary.BigEndian, int32(len(i.([]int32))))
+			for _, value := range i.([]int32) {
+				binary.Write(w, binary.BigEndian, value)
+			}
+		},
+	},
+}
+
+// JMT: The compound reader and writer cause an initialization loop
+// when added to the Tags variable.
+
+func readCompound(r io.Reader) interface{} {
+	payload := []Tag{}
+	var emptytag Tag
+	for newtag, err := ReadTag(r); newtag != emptytag; newtag, err = ReadTag(r) {
+		if err != nil {
+			panic(err)
+		}
+
+		payload = append(payload, newtag)
+	}
+	return payload
+}
+
+func writeCompound(w io.Writer, i interface{}) {
+	tags := append(i.([]Tag), Tag{Type: TAG_End})
+	for _, tag := range tags {
+		WriteTag(w, tag)
+	}
+}
+
 func ReadTag(r io.Reader) (t Tag, err error) {
 	// read a byte
-	ttype := make([]byte, 1)
-	_, err = io.ReadFull(r, ttype)
-	if err != nil {
-		return
-	}
+	ttype := Tags[TAG_Byte].PReader(r).([]byte)[0]
 
 	// TAG_End isn't really a tag
-	if ttype[0] == byte(TAG_End) {
+	if ttype == TAG_End {
 		return
 	}
 
 	// Real tags need types
-	t.Type = ttype[0]
+	t.Type = ttype
 
 	// Now about that name
-	var strlen int16
-	err = binary.Read(r, binary.BigEndian, &strlen)
-	if err != nil {
-		return
-	}
+	t.Name = Tags[TAG_String].PReader(r).(string)
 
-	strbytes := make([]byte, strlen)
-
-	_, err = io.ReadFull(r, strbytes)
-	if err != nil {
-		return
-	}
-
-	t.Name = string(strbytes)
-
-	// Payload-specific code goes here
-	switch t.Type {
-	case TAG_Byte:
-		payload := make([]byte, 1)
-		_, err = io.ReadFull(r, payload)
-		if err != nil {
-			return
-		}
-		t.Payload = payload
-	case TAG_Short:
-		var payload int16
-		err = binary.Read(r, binary.BigEndian, &payload)
-		if err != nil {
-			return
-		}
-		t.Payload = payload
-	case TAG_Int:
-		var payload int32
-		err = binary.Read(r, binary.BigEndian, &payload)
-		if err != nil {
-			return
-		}
-		t.Payload = payload
-	case TAG_Long:
-		var payload int64
-		err = binary.Read(r, binary.BigEndian, &payload)
-		if err != nil {
-			return
-		}
-		t.Payload = payload
-	case TAG_Float:
-		var payload float32
-		err = binary.Read(r, binary.BigEndian, &payload)
-		if err != nil {
-			return
-		}
-		t.Payload = payload
-	case TAG_Double:
-		var payload float64
-		err = binary.Read(r, binary.BigEndian, &payload)
-		if err != nil {
-			return
-		}
-		t.Payload = payload
-	case TAG_Byte_Array:
-		var strlen int32
-		err = binary.Read(r, binary.BigEndian, &strlen)
-		if err != nil {
-			return
-		}
-
-		strbytes := make([]byte, strlen)
-
-		_, err = io.ReadFull(r, strbytes)
-		if err != nil {
-			return
-		}
-
-		t.Payload = strbytes
-	case TAG_String:
-		var strlen int16
-		err = binary.Read(r, binary.BigEndian, &strlen)
-		if err != nil {
-			return
-		}
-
-		strbytes := make([]byte, strlen)
-
-		_, err = io.ReadFull(r, strbytes)
-		if err != nil {
-			return
-		}
-
-		t.Payload = string(strbytes)
-	case TAG_List:
-		// JMT: this is a little annoying.
-		var payload int
-		t.Payload = payload
-	case TAG_Compound:
-		payload := []Tag{}
-		var newtag, emptytag Tag
-		for newtag, err = ReadTag(r); newtag != emptytag; newtag, err = ReadTag(r) {
-			payload = append(payload, newtag)
-		}
-		t.Payload = payload
-	case TAG_Int_Array:
-		var strlen int32
-		err = binary.Read(r, binary.BigEndian, &strlen)
-		if err != nil {
-			return
-		}
-
-		ints := make([]int32, strlen)
-		for key := range ints {
-			err = binary.Read(r, binary.BigEndian, &ints[key])
-			if err != nil {
-				return
-			}
-		}
-
-		t.Payload = ints
-	default:
+	// Putting this in the widget causes an initialization loop issue
+	// (Tags refers to readCompound refers to ReadTag refers to Tags)
+	if t.Type == TAG_Compound {
+		t.Payload = readCompound(r)
+	} else if val, ok := Tags[t.Type]; ok {
+		t.Payload = val.PReader(r)
+	} else {
 		err = fmt.Errorf("unknown tag")
 	}
 	return
 }
 
-// other way
-
 func WriteTag(w io.Writer, t Tag) (err error) {
-	w.Write([]byte{t.Type})
+	// JMT: this []byte{} bit feels wrong
+	Tags[TAG_Byte].PWriter(w, []byte{t.Type})
 
 	if t.Type == TAG_End {
 		return
 	}
 
-	binary.Write(w, binary.BigEndian, int16(len(t.Name)))
-	w.Write([]byte(t.Name))
+	Tags[TAG_String].PWriter(w, t.Name)
 
-	switch t.Type {
-	case TAG_Byte:
-		w.Write(t.Payload.([]byte))
-	case TAG_Short:
-		binary.Write(w, binary.BigEndian, t.Payload.(int16))
-	case TAG_Int:
-		binary.Write(w, binary.BigEndian, t.Payload.(int32))
-	case TAG_Long:
-		binary.Write(w, binary.BigEndian, t.Payload.(int64))
-	case TAG_Float:
-		binary.Write(w, binary.BigEndian, t.Payload.(float32))
-	case TAG_Double:
-		binary.Write(w, binary.BigEndian, t.Payload.(float64))
-	case TAG_Byte_Array:
-		binary.Write(w, binary.BigEndian, int32(len(t.Payload.([]byte))))
-		for _, value := range t.Payload.([]byte) {
-			binary.Write(w, binary.BigEndian, value)
-		}
-	case TAG_String:
-		binary.Write(w, binary.BigEndian, int16(len(t.Payload.(string))))
-		w.Write([]byte(t.Payload.(string)))
-	case TAG_List:
-	case TAG_Compound:
-		tags := append(t.Payload.([]Tag), Tag{Type: TAG_End})
-		for _, tag := range tags {
-			WriteTag(w, tag)
-		}
-	case TAG_Int_Array:
-		binary.Write(w, binary.BigEndian, int32(len(t.Payload.([]int32))))
-		for _, value := range t.Payload.([]int32) {
-			binary.Write(w, binary.BigEndian, value)
-		}
-
-	default:
+	// JMT: initialization loop issue here too
+	if t.Type == TAG_Compound {
+		writeCompound(w, t.Payload)
+	} else if val, ok := Tags[t.Type]; ok {
+		val.PWriter(w, t.Payload)
+	} else {
 		err = fmt.Errorf("unknown tag")
 	}
 	return
