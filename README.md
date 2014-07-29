@@ -1,3 +1,5 @@
+[![Build Status](https://drone.io/github.com/mathuin/terroir/status.png)](https://drone.io/github.com/mathuin/terroir/latest)
+
 # Welcome to Terroir!
 
 Terroir uses real data to generate Minecraft worlds which somewhat resemble actual places in the real world.
