@@ -242,13 +242,14 @@ func readList(r io.Reader) (i interface{}, err error) {
 	if tleni, err = Tags[TAG_Int].PReader(r); err != nil {
 		return
 	}
-	tlen := int(tleni.(int32))
+	tlen := tleni.(int32)
+	var iarrj interface{}
+	var j int32
 	switch tsub {
 	case TAG_Byte:
 		// JMT: so much duplicated code!
 		iarr := make([]byte, tlen)
-		var iarrj interface{}
-		for j := 0; j < tlen; j++ {
+		for j = 0; j < tlen; j++ {
 			if iarrj, err = Tags[tsub].PReader(r); err != nil {
 				return
 			}
@@ -258,8 +259,7 @@ func readList(r io.Reader) (i interface{}, err error) {
 	case TAG_Short:
 		// JMT: so much duplicated code!
 		iarr := make([]int16, tlen)
-		var iarrj interface{}
-		for j := 0; j < tlen; j++ {
+		for j = 0; j < tlen; j++ {
 			if iarrj, err = Tags[tsub].PReader(r); err != nil {
 				return
 			}
@@ -269,8 +269,7 @@ func readList(r io.Reader) (i interface{}, err error) {
 	case TAG_Int:
 		// JMT: so much duplicated code!
 		iarr := make([]int32, tlen)
-		var iarrj interface{}
-		for j := 0; j < tlen; j++ {
+		for j = 0; j < tlen; j++ {
 			if iarrj, err = Tags[tsub].PReader(r); err != nil {
 				return
 			}
@@ -280,8 +279,7 @@ func readList(r io.Reader) (i interface{}, err error) {
 	case TAG_Long:
 		// JMT: so much duplicated code!
 		iarr := make([]int64, tlen)
-		var iarrj interface{}
-		for j := 0; j < tlen; j++ {
+		for j = 0; j < tlen; j++ {
 			if iarrj, err = Tags[tsub].PReader(r); err != nil {
 				return
 			}
@@ -291,8 +289,7 @@ func readList(r io.Reader) (i interface{}, err error) {
 	case TAG_Float:
 		// JMT: so much duplicated code!
 		iarr := make([]float32, tlen)
-		var iarrj interface{}
-		for j := 0; j < tlen; j++ {
+		for j = 0; j < tlen; j++ {
 			if iarrj, err = Tags[tsub].PReader(r); err != nil {
 				return
 			}
@@ -302,8 +299,7 @@ func readList(r io.Reader) (i interface{}, err error) {
 	case TAG_Double:
 		// JMT: so much duplicated code!
 		iarr := make([]float64, tlen)
-		var iarrj interface{}
-		for j := 0; j < tlen; j++ {
+		for j = 0; j < tlen; j++ {
 			if iarrj, err = Tags[tsub].PReader(r); err != nil {
 				return
 			}
@@ -313,8 +309,7 @@ func readList(r io.Reader) (i interface{}, err error) {
 	case TAG_Byte_Array:
 		// JMT: so much duplicated code!
 		iarr := make([][]byte, tlen)
-		var iarrj interface{}
-		for j := 0; j < tlen; j++ {
+		for j = 0; j < tlen; j++ {
 			if iarrj, err = Tags[tsub].PReader(r); err != nil {
 				return
 			}
@@ -324,8 +319,7 @@ func readList(r io.Reader) (i interface{}, err error) {
 	case TAG_String:
 		// JMT: so much duplicated code!
 		iarr := make([]string, tlen)
-		var iarrj interface{}
-		for j := 0; j < tlen; j++ {
+		for j = 0; j < tlen; j++ {
 			if iarrj, err = Tags[tsub].PReader(r); err != nil {
 				return
 			}
@@ -335,8 +329,7 @@ func readList(r io.Reader) (i interface{}, err error) {
 	case TAG_List:
 		// JMT: so much duplicated code!
 		iarr := make([][]interface{}, tlen)
-		var iarrj interface{}
-		for j := 0; j < tlen; j++ {
+		for j = 0; j < tlen; j++ {
 			if iarrj, err = readList(r); err != nil {
 				return
 			}
@@ -346,8 +339,7 @@ func readList(r io.Reader) (i interface{}, err error) {
 	case TAG_Compound:
 		// JMT: so much duplicated code!
 		iarr := make([][]Tag, tlen)
-		var iarrj interface{}
-		for j := 0; j < tlen; j++ {
+		for j = 0; j < tlen; j++ {
 			if iarrj, err = readCompound(r); err != nil {
 				return
 			}
@@ -357,8 +349,7 @@ func readList(r io.Reader) (i interface{}, err error) {
 	case TAG_Int_Array:
 		// JMT: so much duplicated code!
 		iarr := make([][]int32, tlen)
-		var iarrj interface{}
-		for j := 0; j < tlen; j++ {
+		for j = 0; j < tlen; j++ {
 			if iarrj, err = Tags[tsub].PReader(r); err != nil {
 				return
 			}
