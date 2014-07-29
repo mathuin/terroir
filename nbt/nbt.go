@@ -1,50 +1,149 @@
-// Named Binary Tag package
-
-// The NBT format is documented in many places including here:
-// http://minecraft.gamepedia.com/NBT_Format
-
 package nbt
 
-// version 19133, no need to support anything older
+import (
+	"encoding/binary"
+	"fmt"
+	"io"
+)
 
-// tag format:
-// byte 0: id
-// byte 1-2: name len (TAG_End has no name so just one byte)
-// byte 3-n: name UTF-8 (*may* contain spaces, but don't)
-// byte (n+1)-m: payload
+const (
+	TAG_End = iota
+	TAG_Byte
+	TAG_Short
+	TAG_Int
+	TAG_Long
+	TAG_Float
+	TAG_Double
+	TAG_Byte_Array
+	TAG_String
+	TAG_List
+	TAG_Compound
+	TAG_Int_Array
+)
 
-//  0 TAG_End
-//    No payload, no name, just 0
-//  1 TAG_Byte
-//    1 byte / 8 bits, signed (also used for booleans sometimes)
-//  2 TAG_Short
-//    2 bytes / 16 bits, signed, big endian
-//  3 TAG_Int
-//    4 bytes / 32 bits, signed, big endian
-//  4 TAG_Long
-//    8 bytes / 64 bits, signed, big endian
-//  5 TAG_Float
-//    4 bytes / 32 bits, signed, big endian, IEEE 754-2008, binary32
-//  6 TAG_Double
-//    8 bytes / 64 bits, signed, big endian, IEEE 754-2008, binary64
-//  7 TAG_Byte_Array
-//    TAG_Int's payload "size", then size * TAG_Byte payloads
-//  8 TAG_String
-//    TAG_Short's payload "length", then length * UTF-8 code points
-//  9 TAG_List
-//    TAG_Byte's payload "tagId", then TAG_Int's payload "size",
-//    then "size" tag's payloads, all of type tagId
-// 10 TAG_Compound
-//    Fully-formed tags followed by TAG_End.
-// 11 TAG_Int_Array
-//    TAG_Int's payload "size", then size * TAG_Int payloads
+func tagToString(t byte) string {
+	switch t {
+	case TAG_End:
+		return "TAG_End"
+	case TAG_Byte:
+		return "TAG_Byte"
+	case TAG_Short:
+		return "TAG_Short"
+	case TAG_Int:
+		return "TAG_Int"
+	case TAG_Long:
+		return "TAG_Long"
+	case TAG_Float:
+		return "TAG_Float"
+	case TAG_Double:
+		return "TAG_Double"
+	case TAG_Byte_Array:
+		return "TAG_Byte_Array"
+	case TAG_String:
+		return "TAG_String"
+	case TAG_List:
+		return "TAG_List"
+	case TAG_Compound:
+		return "TAG_Compound"
+	case TAG_Int_Array:
+		return "TAG_Int_Array"
+	}
+	return "Unknown tag!"
+}
 
-// Maximum nesting limit for List and Compound tags is 512.
+type Tag struct {
+	Type    byte
+	Name    string
+	Payload interface{}
+}
 
-// Proper NBT files are gzipped TAG_Compound tags with name and tag ID.
+func ReadTag(r io.Reader) (t Tag, err error) {
+	// read a byte
+	ttype := make([]byte, 1)
+	_, err = io.ReadFull(r, ttype)
+	if err != nil {
+		return
+	}
 
-// First: figure out how to read them, using level.dat and friends.
-// Then: figure out how to write them, comparing them to what was read.
-// Next: write tests that match the output of individual tags.
-// Next: write test that handle list and compound tags.
-// Finally: finish dealing with nested files, match to level.dat
+	// TAG_End isn't really a tag
+	if ttype[0] == byte(TAG_End) {
+		return
+	}
+
+	// Real tags need types
+	t.Type = ttype[0]
+
+	// Now about that name
+	lenbytes := make([]byte, 2)
+	_, err = io.ReadFull(r, lenbytes)
+	if err != nil {
+		return
+	}
+
+	strlen := int(lenbytes[0])*256 + int(lenbytes[1])
+
+	strbytes := make([]byte, strlen)
+
+	_, err = io.ReadFull(r, strbytes)
+	if err != nil {
+		return
+	}
+
+	t.Name = string(strbytes)
+
+	// Payload-specific code goes here
+	switch t.Type {
+	case TAG_Byte:
+		payload := make([]byte, 1)
+		_, err = io.ReadFull(r, payload)
+		if err != nil {
+			return
+		}
+		t.Payload = payload
+	case TAG_Int:
+		var payload int32
+		err = binary.Read(r, binary.BigEndian, &payload)
+		if err != nil {
+			return
+		}
+		t.Payload = payload
+	case TAG_Compound:
+		payload := []Tag{}
+		var newtag, emptytag Tag
+		for newtag, err = ReadTag(r); newtag != emptytag; newtag, err = ReadTag(r) {
+			payload = append(payload, newtag)
+		}
+		t.Payload = payload
+	default:
+		err = fmt.Errorf("unknown tag")
+	}
+	return
+}
+
+// other way
+
+func WriteTag(w io.Writer, t Tag) (err error) {
+	w.Write([]byte{t.Type})
+
+	if t.Type == TAG_End {
+		return
+	}
+
+	binary.Write(w, binary.BigEndian, int16(len(t.Name)))
+	w.Write([]byte(t.Name))
+
+	switch t.Type {
+	case TAG_Byte:
+		w.Write(t.Payload.([]byte))
+	case TAG_Int:
+		binary.Write(w, binary.BigEndian, t.Payload.(int32))
+	case TAG_Compound:
+		tags := append(t.Payload.([]Tag), Tag{Type: TAG_End})
+		for _, tag := range tags {
+			WriteTag(w, tag)
+		}
+	default:
+		err = fmt.Errorf("unknown tag")
+	}
+	return
+}
