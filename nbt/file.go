@@ -2,15 +2,11 @@ package nbt
 
 import (
 	"compress/gzip"
+	"io"
 	"os"
 )
 
-// readfile
-// input: filename, compressed
-// output: tag
-
-// big question: can a file's compressed state be detected on the fly?
-// bigger question: SHOULD IT?
+// TODO: consider merging compressed and uncompressed methods together somehow?
 
 func ReadCompressedFile(filename string) (Tag, error) {
 	inf, err := os.Open(filename)
@@ -33,4 +29,33 @@ func ReadUncompressedFile(filename string) (Tag, error) {
 		return Tag{}, err
 	}
 	return ReadTag(f)
+}
+
+func defClose(f io.Closer) {
+	if err := f.Close(); err != nil {
+		panic(err)
+	}
+}
+
+func WriteCompressedFile(filename string, t Tag) error {
+	outf, err := os.Create(filename)
+	if err != nil {
+		return err
+	}
+	defer defClose(outf)
+	f := gzip.NewWriter(outf)
+	if err := WriteTag(f, t); err != nil {
+		return err
+	}
+	f.Close()
+	return nil
+}
+
+func WriteUncompressedFile(filename string, t Tag) error {
+	f, err := os.Create(filename)
+	if err != nil {
+		return err
+	}
+	defer defClose(f)
+	return WriteTag(f, t)
 }
