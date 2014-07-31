@@ -28,185 +28,344 @@ type Tag struct {
 	Payload interface{}
 }
 
+func NewTag(Type byte, Name string) *Tag {
+	return &Tag{Type: Type, Name: Name}
+}
+
+func MakeTag(Type byte, Name string) Tag {
+	return Tag{Type: Type, Name: Name}
+}
+
+func (t *Tag) String() string {
+	return fmt.Sprintf("Tag{Type: %s, Name: %#v, Payload: %#v}", Names[t.Type], t.Name, t.Payload)
+}
+
+func (t *Tag) SetPayload(newp interface{}) error {
+	switch newp.(type) {
+	case byte:
+		if t.Type == TAG_Byte {
+			t.Payload = newp
+			return nil
+		}
+	case int16:
+		if t.Type == TAG_Short {
+			t.Payload = newp
+			return nil
+		}
+	case int32:
+		if t.Type == TAG_Int {
+			t.Payload = newp
+			return nil
+		}
+	case int64:
+		if t.Type == TAG_Long {
+			t.Payload = newp
+			return nil
+		}
+	case float32:
+		if t.Type == TAG_Float {
+			t.Payload = newp
+			return nil
+		}
+	case float64:
+		if t.Type == TAG_Double {
+			t.Payload = newp
+			return nil
+		}
+	case []byte:
+		if t.Type == TAG_Byte_Array {
+			t.Payload = newp
+			return nil
+		}
+	case string:
+		if t.Type == TAG_String {
+			t.Payload = newp
+			return nil
+		}
+	case []Tag:
+		if t.Type == TAG_Compound {
+			t.Payload = newp
+			return nil
+		}
+	case []int32:
+		if t.Type == TAG_Int_Array {
+			t.Payload = newp
+			return nil
+		}
+	// JMT: this must be at the bottom because it's a wildcard effectively
+	case interface{}:
+		if t.Type == TAG_List {
+			t.Payload = newp
+			return nil
+		}
+	}
+	// only set payload if appropriate for this type
+	return fmt.Errorf("tag type %s does not match payload %#+v", Names[t.Type], newp)
+}
+
+var Names = map[byte]string{
+	TAG_End:        "TAG_End",
+	TAG_Byte:       "TAG_Byte",
+	TAG_Short:      "TAG_Short",
+	TAG_Int:        "TAG_Int",
+	TAG_Long:       "TAG_Long",
+	TAG_Float:      "TAG_Float",
+	TAG_Double:     "TAG_Double",
+	TAG_Byte_Array: "TAG_Byte_Array",
+	TAG_String:     "TAG_String",
+	TAG_List:       "TAG_List",
+	TAG_Compound:   "TAG_Compound",
+	TAG_Int_Array:  "TAG_Int_Array",
+}
+
 type PayloadReader func(io.Reader) (interface{}, error)
-type PayloadWriter func(io.Writer, interface{}) error
 
-var Tags = map[byte]struct {
-	String  string
-	PReader PayloadReader
-	PWriter PayloadWriter
-}{
-	TAG_End: {"TAG_End",
-		nil,
-		nil,
+var PReaders = map[byte]PayloadReader{
+	TAG_Byte: func(r io.Reader) (interface{}, error) {
+		payload := make([]byte, 1)
+		if _, err := io.ReadFull(r, payload); err != nil {
+			return nil, err
+		}
+		return payload[0], nil
 	},
-	TAG_Byte: {"TAG_Byte",
-		func(r io.Reader) (interface{}, error) {
-			payload := make([]byte, 1)
-			if _, err := io.ReadFull(r, payload); err != nil {
-				return nil, err
-			}
-			return payload[0], nil
-		},
-		func(w io.Writer, i interface{}) error {
-			b := make([]byte, 1)
-			b[0] = i.(byte)
-			_, err := w.Write(b)
-			return err
-		},
+	TAG_Short: func(r io.Reader) (interface{}, error) {
+		var payload int16
+		if err := binary.Read(r, binary.BigEndian, &payload); err != nil {
+			return nil, err
+		}
+		return payload, nil
 	},
-	TAG_Short: {"TAG_Short",
-		func(r io.Reader) (interface{}, error) {
-			var payload int16
-			if err := binary.Read(r, binary.BigEndian, &payload); err != nil {
-				return nil, err
-			}
-			return payload, nil
-		},
-		func(w io.Writer, i interface{}) error {
-			return binary.Write(w, binary.BigEndian, i.(int16))
-		},
+	TAG_Int: func(r io.Reader) (interface{}, error) {
+		var payload int32
+		if err := binary.Read(r, binary.BigEndian, &payload); err != nil {
+			return nil, err
+		}
+		return payload, nil
 	},
-	TAG_Int: {"TAG_Int",
-		func(r io.Reader) (interface{}, error) {
-			var payload int32
-			if err := binary.Read(r, binary.BigEndian, &payload); err != nil {
-				return nil, err
-			}
-			return payload, nil
-		},
-		func(w io.Writer, i interface{}) error {
-			return binary.Write(w, binary.BigEndian, i.(int32))
-		},
+	TAG_Long: func(r io.Reader) (interface{}, error) {
+		var payload int64
+		if err := binary.Read(r, binary.BigEndian, &payload); err != nil {
+			return nil, err
+		}
+		return payload, nil
 	},
-	TAG_Long: {"TAG_Long",
-		func(r io.Reader) (interface{}, error) {
-			var payload int64
-			if err := binary.Read(r, binary.BigEndian, &payload); err != nil {
-				return nil, err
-			}
-			return payload, nil
-		},
-		func(w io.Writer, i interface{}) error {
-			return binary.Write(w, binary.BigEndian, i.(int64))
-		},
+	TAG_Float: func(r io.Reader) (interface{}, error) {
+		var payload float32
+		if err := binary.Read(r, binary.BigEndian, &payload); err != nil {
+			return nil, err
+		}
+		return payload, nil
 	},
-	TAG_Float: {"TAG_Float",
-		func(r io.Reader) (interface{}, error) {
-			var payload float32
-			if err := binary.Read(r, binary.BigEndian, &payload); err != nil {
-				return nil, err
-			}
-			return payload, nil
-		},
-		func(w io.Writer, i interface{}) error {
-			return binary.Write(w, binary.BigEndian, i.(float32))
-		},
+	TAG_Double: func(r io.Reader) (interface{}, error) {
+		var payload float64
+		if err := binary.Read(r, binary.BigEndian, &payload); err != nil {
+			return nil, err
+		}
+		return payload, nil
 	},
-	TAG_Double: {"TAG_Double",
-		func(r io.Reader) (interface{}, error) {
-			var payload float64
-			if err := binary.Read(r, binary.BigEndian, &payload); err != nil {
-				return nil, err
-			}
-			return payload, nil
-		},
-		func(w io.Writer, i interface{}) error {
-			return binary.Write(w, binary.BigEndian, i.(float64))
-		},
-	},
-	TAG_Byte_Array: {"TAG_Byte_Array",
-		func(r io.Reader) (interface{}, error) {
-			var strlen int32
-			if err := binary.Read(r, binary.BigEndian, &strlen); err != nil {
-				return nil, err
-			}
+	TAG_Byte_Array: func(r io.Reader) (interface{}, error) {
+		var strlen int32
+		if err := binary.Read(r, binary.BigEndian, &strlen); err != nil {
+			return nil, err
+		}
 
-			strbytes := make([]byte, strlen)
+		strbytes := make([]byte, strlen)
 
-			if _, err := io.ReadFull(r, strbytes); err != nil {
+		if _, err := io.ReadFull(r, strbytes); err != nil {
+			return nil, err
+		}
+
+		return strbytes, nil
+	},
+	TAG_String: func(r io.Reader) (interface{}, error) {
+		var strlen int16
+		if err := binary.Read(r, binary.BigEndian, &strlen); err != nil {
+			return nil, err
+		}
+
+		strbytes := make([]byte, strlen)
+
+		if _, err := io.ReadFull(r, strbytes); err != nil {
+			return nil, err
+		}
+
+		return string(strbytes), nil
+	},
+	TAG_Int_Array: func(r io.Reader) (interface{}, error) {
+		var strlen int32
+		if err := binary.Read(r, binary.BigEndian, &strlen); err != nil {
+			return nil, err
+		}
+
+		ints := make([]int32, strlen)
+		for key := range ints {
+			if err := binary.Read(r, binary.BigEndian, &ints[key]); err != nil {
 				return nil, err
 			}
+		}
 
-			return strbytes, nil
-		},
-		func(w io.Writer, i interface{}) error {
-			if err := binary.Write(w, binary.BigEndian, int32(len(i.([]byte)))); err != nil {
-				return err
-			}
-			for _, value := range i.([]byte) {
-				if err := binary.Write(w, binary.BigEndian, value); err != nil {
-					return err
-				}
-			}
-			return nil
-		},
-	},
-	TAG_String: {"TAG_String",
-		func(r io.Reader) (interface{}, error) {
-			var strlen int16
-			if err := binary.Read(r, binary.BigEndian, &strlen); err != nil {
-				return nil, err
-			}
-
-			strbytes := make([]byte, strlen)
-
-			if _, err := io.ReadFull(r, strbytes); err != nil {
-				return nil, err
-			}
-
-			return string(strbytes), nil
-		},
-		func(w io.Writer, i interface{}) error {
-			if err := binary.Write(w, binary.BigEndian, int16(len(i.(string)))); err != nil {
-				return err
-			}
-			_, err := w.Write([]byte(i.(string)))
-			return err
-		},
-	},
-	TAG_List: {"TAG_List",
-		// JMT: figure out how to break loop
-		nil,
-		nil,
-	},
-	TAG_Compound: {"TAG_Compound",
-		// JMT: figure out how to break loop
-		nil,
-		nil,
-	},
-	TAG_Int_Array: {"TAG_Int_Array",
-		func(r io.Reader) (interface{}, error) {
-			var strlen int32
-			if err := binary.Read(r, binary.BigEndian, &strlen); err != nil {
-				return nil, err
-			}
-
-			ints := make([]int32, strlen)
-			for key := range ints {
-				if err := binary.Read(r, binary.BigEndian, &ints[key]); err != nil {
-					return nil, err
-				}
-			}
-
-			return ints, nil
-		},
-		func(w io.Writer, i interface{}) error {
-			if err := binary.Write(w, binary.BigEndian, int32(len(i.([]int32)))); err != nil {
-				return err
-			}
-			for _, value := range i.([]int32) {
-				if err := binary.Write(w, binary.BigEndian, value); err != nil {
-					return err
-				}
-			}
-			return nil
-		},
+		return ints, nil
 	},
 }
 
-// JMT: The compound reader and writer cause an initialization loop
-// when added to the Tags variable.
+type PayloadWriter func(io.Writer, interface{}) error
+
+var PWriters = map[byte]PayloadWriter{
+	TAG_Byte: func(w io.Writer, i interface{}) error {
+		b := make([]byte, 1)
+		b[0] = i.(byte)
+		_, err := w.Write(b)
+		return err
+	},
+	TAG_Short: func(w io.Writer, i interface{}) error {
+		return binary.Write(w, binary.BigEndian, i.(int16))
+	},
+	TAG_Int: func(w io.Writer, i interface{}) error {
+		return binary.Write(w, binary.BigEndian, i.(int32))
+	},
+	TAG_Long: func(w io.Writer, i interface{}) error {
+		return binary.Write(w, binary.BigEndian, i.(int64))
+	},
+	TAG_Float: func(w io.Writer, i interface{}) error {
+		return binary.Write(w, binary.BigEndian, i.(float32))
+	},
+	TAG_Double: func(w io.Writer, i interface{}) error {
+		return binary.Write(w, binary.BigEndian, i.(float64))
+	},
+	TAG_Byte_Array: func(w io.Writer, i interface{}) error {
+		if err := binary.Write(w, binary.BigEndian, int32(len(i.([]byte)))); err != nil {
+			return err
+		}
+		for _, value := range i.([]byte) {
+			if err := binary.Write(w, binary.BigEndian, value); err != nil {
+				return err
+			}
+		}
+		return nil
+	},
+	TAG_String: func(w io.Writer, i interface{}) error {
+		if err := binary.Write(w, binary.BigEndian, int16(len(i.(string)))); err != nil {
+			return err
+		}
+		_, err := w.Write([]byte(i.(string)))
+		return err
+	},
+	TAG_Int_Array: func(w io.Writer, i interface{}) error {
+		if err := binary.Write(w, binary.BigEndian, int32(len(i.([]int32)))); err != nil {
+			return err
+		}
+		for _, value := range i.([]int32) {
+			if err := binary.Write(w, binary.BigEndian, value); err != nil {
+				return err
+			}
+		}
+		return nil
+	},
+}
+
+type ListReader func(io.Reader, int) (interface{}, error)
+
+var LReaders = map[byte]ListReader{
+	TAG_Byte: func(r io.Reader, tlen int) (interface{}, error) {
+		iarr := make([]byte, tlen)
+		for j := 0; j < tlen; j++ {
+			if iarrj, err := PReaders[TAG_Byte](r); err != nil {
+				return nil, err
+			} else {
+				iarr[j] = iarrj.(byte)
+			}
+		}
+		return iarr, nil
+	},
+	TAG_Short: func(r io.Reader, tlen int) (interface{}, error) {
+		iarr := make([]int16, tlen)
+		for j := 0; j < tlen; j++ {
+			if iarrj, err := PReaders[TAG_Short](r); err != nil {
+				return nil, err
+			} else {
+				iarr[j] = iarrj.(int16)
+			}
+		}
+		return iarr, nil
+	},
+	TAG_Int: func(r io.Reader, tlen int) (interface{}, error) {
+		iarr := make([]int32, tlen)
+		for j := 0; j < tlen; j++ {
+			if iarrj, err := PReaders[TAG_Int](r); err != nil {
+				return nil, err
+			} else {
+				iarr[j] = iarrj.(int32)
+			}
+		}
+		return iarr, nil
+	},
+	TAG_Long: func(r io.Reader, tlen int) (interface{}, error) {
+		iarr := make([]int64, tlen)
+		for j := 0; j < tlen; j++ {
+			if iarrj, err := PReaders[TAG_Long](r); err != nil {
+				return nil, err
+			} else {
+				iarr[j] = iarrj.(int64)
+			}
+		}
+		return iarr, nil
+	},
+	TAG_Float: func(r io.Reader, tlen int) (interface{}, error) {
+		iarr := make([]float32, tlen)
+		for j := 0; j < tlen; j++ {
+			if iarrj, err := PReaders[TAG_Float](r); err != nil {
+				return nil, err
+			} else {
+				iarr[j] = iarrj.(float32)
+			}
+		}
+		return iarr, nil
+	},
+	TAG_Double: func(r io.Reader, tlen int) (interface{}, error) {
+		iarr := make([]float64, tlen)
+		for j := 0; j < tlen; j++ {
+			if iarrj, err := PReaders[TAG_Double](r); err != nil {
+				return nil, err
+			} else {
+				iarr[j] = iarrj.(float64)
+			}
+		}
+		return iarr, nil
+	},
+	TAG_Byte_Array: func(r io.Reader, tlen int) (interface{}, error) {
+		iarr := make([][]byte, tlen)
+		for j := 0; j < tlen; j++ {
+			if iarrj, err := PReaders[TAG_Byte_Array](r); err != nil {
+				return nil, err
+			} else {
+				iarr[j] = iarrj.([]byte)
+			}
+		}
+		return iarr, nil
+	},
+	TAG_String: func(r io.Reader, tlen int) (interface{}, error) {
+		iarr := make([]string, tlen)
+		for j := 0; j < tlen; j++ {
+			if iarrj, err := PReaders[TAG_String](r); err != nil {
+				return nil, err
+			} else {
+				iarr[j] = iarrj.(string)
+			}
+		}
+		return iarr, nil
+	},
+	TAG_Int_Array: func(r io.Reader, tlen int) (interface{}, error) {
+		iarr := make([][]int32, tlen)
+		for j := 0; j < tlen; j++ {
+			if iarrj, err := PReaders[TAG_Int_Array](r); err != nil {
+				return nil, err
+			} else {
+				iarr[j] = iarrj.([]int32)
+			}
+		}
+		return iarr, nil
+	},
+}
 
 func readCompound(r io.Reader) (interface{}, error) {
 	payload := []Tag{}
@@ -221,7 +380,7 @@ func readCompound(r io.Reader) (interface{}, error) {
 }
 
 func writeCompound(w io.Writer, i interface{}) error {
-	tags := append(i.([]Tag), Tag{Type: TAG_End})
+	tags := append(i.([]Tag), MakeTag(TAG_End, ""))
 	for _, tag := range tags {
 		if err := WriteTag(w, tag); err != nil {
 			return err
@@ -230,136 +389,49 @@ func writeCompound(w io.Writer, i interface{}) error {
 	return nil
 }
 
-// same for the list
-
 func readList(r io.Reader) (i interface{}, err error) {
-	var tsubi interface{}
-	if tsubi, err = Tags[TAG_Byte].PReader(r); err != nil {
+	var tsubi, tleni interface{}
+	if tsubi, err = PReaders[TAG_Byte](r); err != nil {
 		return
 	}
 	tsub := tsubi.(byte)
-	var tleni interface{}
-	if tleni, err = Tags[TAG_Int].PReader(r); err != nil {
+
+	if tleni, err = PReaders[TAG_Int](r); err != nil {
 		return
 	}
-	tlen := tleni.(int32)
-	var iarrj interface{}
-	var j int32
+	tlen := int(tleni.(int32))
+
 	switch tsub {
-	case TAG_Byte:
-		// JMT: so much duplicated code!
-		iarr := make([]byte, tlen)
-		for j = 0; j < tlen; j++ {
-			if iarrj, err = Tags[tsub].PReader(r); err != nil {
-				return
-			}
-			iarr[j] = iarrj.(byte)
-		}
-		return iarr, nil
-	case TAG_Short:
-		// JMT: so much duplicated code!
-		iarr := make([]int16, tlen)
-		for j = 0; j < tlen; j++ {
-			if iarrj, err = Tags[tsub].PReader(r); err != nil {
-				return
-			}
-			iarr[j] = iarrj.(int16)
-		}
-		return iarr, nil
-	case TAG_Int:
-		// JMT: so much duplicated code!
-		iarr := make([]int32, tlen)
-		for j = 0; j < tlen; j++ {
-			if iarrj, err = Tags[tsub].PReader(r); err != nil {
-				return
-			}
-			iarr[j] = iarrj.(int32)
-		}
-		return iarr, nil
-	case TAG_Long:
-		// JMT: so much duplicated code!
-		iarr := make([]int64, tlen)
-		for j = 0; j < tlen; j++ {
-			if iarrj, err = Tags[tsub].PReader(r); err != nil {
-				return
-			}
-			iarr[j] = iarrj.(int64)
-		}
-		return iarr, nil
-	case TAG_Float:
-		// JMT: so much duplicated code!
-		iarr := make([]float32, tlen)
-		for j = 0; j < tlen; j++ {
-			if iarrj, err = Tags[tsub].PReader(r); err != nil {
-				return
-			}
-			iarr[j] = iarrj.(float32)
-		}
-		return iarr, nil
-	case TAG_Double:
-		// JMT: so much duplicated code!
-		iarr := make([]float64, tlen)
-		for j = 0; j < tlen; j++ {
-			if iarrj, err = Tags[tsub].PReader(r); err != nil {
-				return
-			}
-			iarr[j] = iarrj.(float64)
-		}
-		return iarr, nil
-	case TAG_Byte_Array:
-		// JMT: so much duplicated code!
-		iarr := make([][]byte, tlen)
-		for j = 0; j < tlen; j++ {
-			if iarrj, err = Tags[tsub].PReader(r); err != nil {
-				return
-			}
-			iarr[j] = iarrj.([]byte)
-		}
-		return iarr, nil
-	case TAG_String:
-		// JMT: so much duplicated code!
-		iarr := make([]string, tlen)
-		for j = 0; j < tlen; j++ {
-			if iarrj, err = Tags[tsub].PReader(r); err != nil {
-				return
-			}
-			iarr[j] = iarrj.(string)
-		}
-		return iarr, nil
 	case TAG_List:
-		// JMT: so much duplicated code!
 		iarr := make([][]interface{}, tlen)
-		for j = 0; j < tlen; j++ {
-			if iarrj, err = readList(r); err != nil {
-				return
+		for j := 0; j < tlen; j++ {
+			if iarrj, err := readList(r); err != nil {
+				return nil, err
+			} else {
+				iarr[j] = iarrj.([]interface{})
 			}
-			iarr[j] = iarrj.([]interface{})
 		}
 		return iarr, nil
 	case TAG_Compound:
-		// JMT: so much duplicated code!
 		iarr := make([][]Tag, tlen)
-		for j = 0; j < tlen; j++ {
-			if iarrj, err = readCompound(r); err != nil {
-				return
+		for j := 0; j < tlen; j++ {
+			if iarrj, err := readCompound(r); err != nil {
+				return nil, err
+			} else {
+				iarr[j] = iarrj.([]Tag)
 			}
-			iarr[j] = iarrj.([]Tag)
 		}
 		return iarr, nil
-	case TAG_Int_Array:
-		// JMT: so much duplicated code!
-		iarr := make([][]int32, tlen)
-		for j = 0; j < tlen; j++ {
-			if iarrj, err = Tags[tsub].PReader(r); err != nil {
-				return
-			}
-			iarr[j] = iarrj.([]int32)
+	default:
+		if val, ok := LReaders[tsub]; ok {
+			return val(r, tlen)
+		} else {
+			return
 		}
-		return iarr, nil
 	}
-	return
 }
 
+// JMT: not sure if this can be normalized due to type thing
 func writeList(w io.Writer, i interface{}) error {
 	var tsub byte
 	var tlen int32
@@ -370,7 +442,7 @@ func writeList(w io.Writer, i interface{}) error {
 		tsub = TAG_Byte
 		tlen = int32(len(arr))
 		for _, value := range arr {
-			if err := Tags[tsub].PWriter(&tout, value); err != nil {
+			if err := PWriters[tsub](&tout, value); err != nil {
 				return err
 			}
 		}
@@ -379,7 +451,7 @@ func writeList(w io.Writer, i interface{}) error {
 		tsub = TAG_Short
 		tlen = int32(len(arr))
 		for _, value := range arr {
-			if err := Tags[tsub].PWriter(&tout, value); err != nil {
+			if err := PWriters[tsub](&tout, value); err != nil {
 				return err
 			}
 		}
@@ -388,7 +460,7 @@ func writeList(w io.Writer, i interface{}) error {
 		tsub = TAG_Int
 		tlen = int32(len(arr))
 		for _, value := range arr {
-			if err := Tags[tsub].PWriter(&tout, value); err != nil {
+			if err := PWriters[tsub](&tout, value); err != nil {
 				return err
 			}
 		}
@@ -397,7 +469,7 @@ func writeList(w io.Writer, i interface{}) error {
 		tsub = TAG_Long
 		tlen = int32(len(arr))
 		for _, value := range arr {
-			if err := Tags[tsub].PWriter(&tout, value); err != nil {
+			if err := PWriters[tsub](&tout, value); err != nil {
 				return err
 			}
 		}
@@ -406,7 +478,7 @@ func writeList(w io.Writer, i interface{}) error {
 		tsub = TAG_Float
 		tlen = int32(len(arr))
 		for _, value := range arr {
-			if err := Tags[tsub].PWriter(&tout, value); err != nil {
+			if err := PWriters[tsub](&tout, value); err != nil {
 				return err
 			}
 		}
@@ -415,7 +487,7 @@ func writeList(w io.Writer, i interface{}) error {
 		tsub = TAG_Double
 		tlen = int32(len(arr))
 		for _, value := range arr {
-			if err := Tags[tsub].PWriter(&tout, value); err != nil {
+			if err := PWriters[tsub](&tout, value); err != nil {
 				return err
 			}
 		}
@@ -424,7 +496,7 @@ func writeList(w io.Writer, i interface{}) error {
 		tsub = TAG_Byte_Array
 		tlen = int32(len(arr))
 		for _, value := range arr {
-			if err := Tags[tsub].PWriter(&tout, value); err != nil {
+			if err := PWriters[tsub](&tout, value); err != nil {
 				return err
 			}
 		}
@@ -433,7 +505,7 @@ func writeList(w io.Writer, i interface{}) error {
 		tsub = TAG_String
 		tlen = int32(len(arr))
 		for _, value := range arr {
-			if err := Tags[tsub].PWriter(&tout, value); err != nil {
+			if err := PWriters[tsub](&tout, value); err != nil {
 				return err
 			}
 		}
@@ -460,67 +532,68 @@ func writeList(w io.Writer, i interface{}) error {
 		tsub = TAG_Int_Array
 		tlen = int32(len(arr))
 		for _, value := range arr {
-			if err := Tags[tsub].PWriter(&tout, value); err != nil {
+			if err := PWriters[tsub](&tout, value); err != nil {
 				return err
 			}
 		}
 	}
-	Tags[TAG_Byte].PWriter(w, tsub)
-	Tags[TAG_Int].PWriter(w, tlen)
+	PWriters[TAG_Byte](w, tsub)
+	PWriters[TAG_Int](w, tlen)
 	tout.WriteTo(w)
 	return nil
 }
 
-func ReadTag(r io.Reader) (t Tag, err error) {
-	// read a byte
+func ReadTag(r io.Reader) (Tag, error) {
+	// defaults
+	t := MakeTag(TAG_End, "")
+	err := fmt.Errorf("unknown tag")
+
 	var ttypei, tnamei interface{}
-	if ttypei, err = Tags[TAG_Byte].PReader(r); err != nil {
+	if ttypei, err = PReaders[TAG_Byte](r); err != nil {
 		return t, err
 	}
 	ttype := ttypei.(byte)
 
-	// TAG_End isn't really a tag
 	if ttype == TAG_End {
-		return
+		return t, err
 	}
 
-	// Now about that name
-	if tnamei, err = Tags[TAG_String].PReader(r); err != nil {
-		return
+	if tnamei, err = PReaders[TAG_String](r); err != nil {
+		return t, err
 	}
 	tname := tnamei.(string)
 
-	// Putting this in the widget causes an initialization loop issue
-	// (Tags refers to readCompound refers to ReadTag refers to Tags)
+	var payload interface{}
 	switch ttype {
 	case TAG_List:
-		if payload, err := readList(r); err == nil {
-			t = Tag{Type: ttype, Name: tname, Payload: payload}
+		if payload, err = readList(r); err == nil {
+			t = MakeTag(ttype, tname)
+			err = t.SetPayload(payload)
 		}
 	case TAG_Compound:
-		if payload, err := readCompound(r); err == nil {
-			t = Tag{Type: ttype, Name: tname, Payload: payload}
+		if payload, err = readCompound(r); err == nil {
+			t = MakeTag(ttype, tname)
+			err = t.SetPayload(payload)
 		}
 	default:
-		if val, ok := Tags[ttype]; ok {
-			if payload, err := val.PReader(r); err == nil {
-				t = Tag{Type: ttype, Name: tname, Payload: payload}
+		if val, ok := PReaders[ttype]; ok {
+			if payload, err = val(r); err == nil {
+				t = MakeTag(ttype, tname)
+				err = t.SetPayload(payload)
 			}
-		} else {
-			err = fmt.Errorf("unknown tag")
 		}
 	}
-	return
+	return t, err
 }
 
 func WriteTag(w io.Writer, t Tag) (err error) {
-	Tags[TAG_Byte].PWriter(w, t.Type)
+	PWriters[TAG_Byte](w, t.Type)
 
 	if t.Type == TAG_End {
 		return
 	}
 
-	Tags[TAG_String].PWriter(w, t.Name)
+	PWriters[TAG_String](w, t.Name)
 
 	// JMT: initialization loop issue here too
 	switch t.Type {
@@ -529,8 +602,8 @@ func WriteTag(w io.Writer, t Tag) (err error) {
 	case TAG_Compound:
 		err = writeCompound(w, t.Payload)
 	default:
-		if val, ok := Tags[t.Type]; ok {
-			err = val.PWriter(w, t.Payload)
+		if val, ok := PWriters[t.Type]; ok {
+			err = val(w, t.Payload)
 		} else {
 			err = fmt.Errorf("unknown tag")
 		}
