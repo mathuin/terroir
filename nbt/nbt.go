@@ -5,7 +5,10 @@ import (
 	"encoding/binary"
 	"fmt"
 	"io"
+	"log"
 )
+
+var Debug = false
 
 const (
 	TAG_End        byte = 0
@@ -29,18 +32,31 @@ type Tag struct {
 }
 
 func NewTag(Type byte, Name string) *Tag {
+	if Debug {
+		if Type != TAG_End {
+			log.Printf("NEW TAG: type %s and name %#v", Names[Type], Name)
+		}
+	}
 	return &Tag{Type: Type, Name: Name}
 }
 
 func MakeTag(Type byte, Name string) Tag {
+	if Debug {
+		if Type != TAG_End {
+			log.Printf("MAKE TAG: type %s and name %#v", Names[Type], Name)
+		}
+	}
 	return Tag{Type: Type, Name: Name}
 }
 
-func (t *Tag) String() string {
-	return fmt.Sprintf("Tag{Type: %s, Name: %#v, Payload: %#v}", Names[t.Type], t.Name, t.Payload)
+func (t Tag) String() string {
+	return fmt.Sprintf("Tag{Type: %s, Name: %#v, Payload: %v}", Names[t.Type], t.Name, t.Payload)
 }
 
 func (t *Tag) SetPayload(newp interface{}) error {
+	if Debug {
+		log.Printf("SET PAYLOAD: type %s, name %#v, payload %v (%T)", Names[t.Type], t.Name, newp, newp)
+	}
 	switch newp.(type) {
 	case byte:
 		if t.Type == TAG_Byte {
@@ -100,7 +116,7 @@ func (t *Tag) SetPayload(newp interface{}) error {
 		}
 	}
 	// only set payload if appropriate for this type
-	return fmt.Errorf("tag type %s does not match payload %#+v", Names[t.Type], newp)
+	return fmt.Errorf("type %s does not match payload %v (%T)", Names[t.Type], newp, newp)
 }
 
 var Names = map[byte]string{
