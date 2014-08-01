@@ -9,11 +9,6 @@ import (
 	"path"
 )
 
-// When instantiated on disk:
-// A world is a directory with a name and permissions 775.
-// in that directory is a file named level.dat with permissions 664.
-// that level.dat file is a compressed NBT file containing certain data.
-
 var Debug = false
 
 type World struct {
