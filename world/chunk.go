@@ -17,52 +17,6 @@ type Section struct {
 	blockSky FullByte
 }
 
-func split(in byte) (byte, byte) {
-	return in >> 4, ((in << 4) >> 4)
-}
-
-func unsplit(top byte, bot byte) byte {
-	return top*16 + bot
-}
-
-func toHalf(inlow byte, inhigh byte) (outtop byte, outbot byte) {
-	inlowtop, inlowbot := split(inlow)
-	inhightop, inhighbot := split(inhigh)
-
-	outtop = unsplit(inhightop, inlowtop)
-	outbot = unsplit(inhighbot, inlowbot)
-	return
-}
-
-func toDouble(intop byte, inbot byte) (outlow byte, outhigh byte) {
-	intoptop, intopbot := split(intop)
-	inbottop, inbotbot := split(inbot)
-
-	outlow = unsplit(intopbot, inbotbot)
-	outhigh = unsplit(intoptop, inbottop)
-	return
-}
-
-func Half(arrin FullByte, top bool) (arrout HalfByte) {
-	for i := range arrout {
-		outtop, outbot := toHalf(arrin[i/2], arrin[i/2+1])
-		if top {
-			arrout[i] = outtop
-		} else {
-			arrout[i] = outbot
-		}
-	}
-	return
-}
-
-func Double(top HalfByte, bot HalfByte) (full FullByte) {
-	for i := range top {
-		di := i * 2
-		full[di], full[di+1] = toDouble(top[i], bot[i])
-	}
-	return
-}
-
 func (s Section) add() HalfByte {
 	return Half(s.addData, true)
 }
@@ -80,13 +34,20 @@ func (s Section) skyLight() HalfByte {
 }
 
 func (s Section) write(y int) nbt.Tag {
+	add, data := Halve(s.addData)
+	blockLight, skyLight := Halve(s.blockSky)
+
 	sElems := []nbt.CompoundElem{
 		{"Y", nbt.TAG_Byte, byte(y)},
 		{"Blocks", nbt.TAG_Byte_Array, s.blocks},
-		{"Add", nbt.TAG_Byte_Array, s.add()},
-		{"Data", nbt.TAG_Byte_Array, s.data()},
-		{"BlockLight", nbt.TAG_Byte_Array, s.blockLight()},
-		{"SkyLight", nbt.TAG_Byte_Array, s.skyLight()},
+		// {"Add", nbt.TAG_Byte_Array, s.add()},
+		// {"Data", nbt.TAG_Byte_Array, s.data()},
+		// {"BlockLight", nbt.TAG_Byte_Array, s.blockLight()},
+		// {"SkyLight", nbt.TAG_Byte_Array, s.skyLight()},
+		{"Add", nbt.TAG_Byte_Array, add},
+		{"Data", nbt.TAG_Byte_Array, data},
+		{"BlockLight", nbt.TAG_Byte_Array, blockLight},
+		{"SkyLight", nbt.TAG_Byte_Array, skyLight},
 	}
 
 	sTag := nbt.MakeCompound("", sElems)

@@ -18,10 +18,21 @@ func Test_newLevel(t *testing.T) {
 	w.SetRandomSeed(prseed)
 	w.SetSpawn(px, py, pz)
 
-	// JMT: make this a map like the chunk read checker!
-	levelNameCheck := false
-	spawnXCheck := false
-	gameRulesCheck := false
+	requiredTags := map[string]bool{
+		"LevelName":  false,
+		"SpawnX":     false,
+		"SpawnY":     false,
+		"SpawnZ":     false,
+		"RandomSeed": false,
+		"version":    false,
+		"GameRules":  false,
+	}
+
+	gameRulesRequiredTags := map[string]bool{
+		"commandBlockOutput": false,
+		"doTileDrops":        false,
+		"keepInventory":      false,
+	}
 
 	testNewLevel, err := w.level()
 	if err != nil {
@@ -41,28 +52,32 @@ func Test_newLevel(t *testing.T) {
 			if tag.Payload.(string) != pname {
 				t.Errorf("Name does not match\n")
 			}
-			levelNameCheck = true
+			requiredTags[tag.Name] = true
 		case "SpawnX":
 			if tag.Payload.(int32) != px {
 				t.Errorf("SpawnX does not match\n")
 			}
-			spawnXCheck = true
+			requiredTags[tag.Name] = true
 		case "SpawnY":
 			if tag.Payload.(int32) != py {
 				t.Errorf("SpawnY does not match\n")
 			}
+			requiredTags[tag.Name] = true
 		case "SpawnZ":
 			if tag.Payload.(int32) != pz {
 				t.Errorf("SpawnZ does not match\n")
 			}
+			requiredTags[tag.Name] = true
 		case "RandomSeed":
 			if tag.Payload.(int64) != prseed {
 				t.Errorf("SpawnX does not match\n")
 			}
+			requiredTags[tag.Name] = true
 		case "version":
 			if tag.Payload.(int32) != int32(19133) {
 				t.Errorf("version does not match\n")
 			}
+			requiredTags[tag.Name] = true
 		case "commandBlockOutput":
 			t.Errorf("commandBlockOutput does not belong in top level\n")
 		case "GameRules":
@@ -72,26 +87,30 @@ func Test_newLevel(t *testing.T) {
 					if ruletag.Payload.(string) != "true" {
 						t.Errorf("commandBlockOutput does not match\n")
 					}
+					gameRulesRequiredTags[ruletag.Name] = true
 				case "doTileDrops":
 					if ruletag.Payload.(string) != "true" {
 						t.Errorf("doTileDrops does not match\n")
 					}
+					gameRulesRequiredTags[ruletag.Name] = true
 				case "keepInventory":
 					if ruletag.Payload.(string) != "false" {
 						t.Errorf("keepInventory does not match\n")
 					}
+					gameRulesRequiredTags[ruletag.Name] = true
 				}
 			}
-			gameRulesCheck = true
+			requiredTags[tag.Name] = true
 		}
 	}
-	if !levelNameCheck {
-		t.Errorf("missing LevelName tag")
+	for rtkey, rtval := range requiredTags {
+		if rtval == false {
+			t.Errorf("tag name %s required for section but not found", rtkey)
+		}
 	}
-	if !spawnXCheck {
-		t.Errorf("missing SpawnX tag")
-	}
-	if !gameRulesCheck {
-		t.Errorf("missing GameRules tag")
+	for rtkey, rtval := range gameRulesRequiredTags {
+		if rtval == false {
+			t.Errorf("tag name %s required for game rules but not found", rtkey)
+		}
 	}
 }
