@@ -4,6 +4,7 @@ package world
 
 import (
 	"fmt"
+	"path"
 
 	"github.com/mathuin/terroir/nbt"
 )
@@ -78,4 +79,16 @@ func (w World) level() (t nbt.Tag, err error) {
 	t = nbt.MakeTag(nbt.TAG_Compound, "")
 	t.SetPayload([]nbt.Tag{dataTag})
 	return
+}
+
+func (w World) writelevel(dir string) error {
+	if path.Base(dir) != w.Name {
+		return fmt.Errorf("directory does not contain world name")
+	}
+	levelTag, err := w.level()
+	if err != nil {
+		return err
+	}
+	levelFile := path.Join(dir, "level.dat")
+	return nbt.WriteCompressedFile(levelFile, levelTag)
 }

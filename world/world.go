@@ -7,8 +7,6 @@ import (
 	"log"
 	"os"
 	"path"
-
-	"github.com/mathuin/terroir/nbt"
 )
 
 // When instantiated on disk:
@@ -66,25 +64,28 @@ func (w *World) SetSpawn(x int32, y int32, z int32) {
 	w.spawnSet = true
 }
 
-func (w World) Write(dir string) {
+func (w World) Write(dir string) error {
 	// make sure the directory exists and is writeable
 	if _, err := os.Stat(dir); err != nil {
 		if os.IsNotExist(err) {
 			os.Mkdir(dir, 0775)
+		} else {
+			return err
 		}
 	}
-	levelDir := path.Join(dir, w.Name)
-	if _, err := os.Stat(levelDir); err != nil {
+	worldDir := path.Join(dir, w.Name)
+	if _, err := os.Stat(worldDir); err != nil {
 		if os.IsNotExist(err) {
-			os.Mkdir(levelDir, 0775)
+			os.Mkdir(worldDir, 0775)
+		} else {
+			return err
 		}
 	}
-	levelFile := path.Join(levelDir, "level.dat")
-	levelTag, err := w.level()
-	if err != nil {
-		panic("Error creating level tag")
+
+	// write level
+	if err := w.writelevel(worldDir); err != nil {
+		return err
 	}
-	if err := nbt.WriteCompressedFile(levelFile, levelTag); err != nil {
-		panic("Error writing level tag")
-	}
+
+	return nil
 }
