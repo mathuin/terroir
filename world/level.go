@@ -13,36 +13,21 @@ func (w World) level() (t nbt.Tag, err error) {
 	if w.spawnSet == false {
 		return t, fmt.Errorf("Spawn must be set before creating level")
 	}
-	var gamerules = []struct {
-		key   string
-		value string
-	}{
-		{"commandBlockOutput", "true"},
-		{"doDaylightCycle", "true"},
-		{"doFireTick", "true"},
-		{"doMobLoot", "true"},
-		{"doMobSpawning", "true"},
-		{"doTileDrops", "true"},
-		{"keepInventory", "false"},
-		{"mobGriefing", "true"},
-		{"naturalRegeneration", "true"},
+	gameRulesElems := []nbt.CompoundElem{
+		{"commandBlockOutput", nbt.TAG_String, "true"},
+		{"doDaylightCycle", nbt.TAG_String, "true"},
+		{"doFireTick", nbt.TAG_String, "true"},
+		{"doMobLoot", nbt.TAG_String, "true"},
+		{"doMobSpawning", nbt.TAG_String, "true"},
+		{"doTileDrops", nbt.TAG_String, "true"},
+		{"keepInventory", nbt.TAG_String, "false"},
+		{"mobGriefing", nbt.TAG_String, "true"},
+		{"naturalRegeneration", nbt.TAG_String, "true"},
 	}
 
-	gameRulesPayload := make([]nbt.Tag, 0)
+	gameRulesPayload := nbt.MakeCompoundPayload(gameRulesElems)
 
-	for _, rule := range gamerules {
-		newTag := nbt.MakeTag(nbt.TAG_String, rule.key)
-		newTag.SetPayload(rule.value)
-		gameRulesPayload = append(gameRulesPayload, newTag)
-	}
-
-	dataPayload := make([]nbt.Tag, 0)
-
-	var tags = []struct {
-		key   string
-		tag   byte
-		value interface{}
-	}{
+	dataElems := []nbt.CompoundElem{
 		{"allowCommands", nbt.TAG_Byte, byte(0)},
 		{"generatorName", nbt.TAG_String, "default"},
 		{"generatorOptions", nbt.TAG_String, ""},
@@ -67,14 +52,7 @@ func (w World) level() (t nbt.Tag, err error) {
 		{"SpawnZ", nbt.TAG_Int, w.spawnZ},
 		{"Time", nbt.TAG_Long, int64(0)},
 	}
-	for _, tag := range tags {
-		newTag := nbt.MakeTag(tag.tag, tag.key)
-		newTag.SetPayload(tag.value)
-		dataPayload = append(dataPayload, newTag)
-	}
-
-	dataTag := nbt.MakeTag(nbt.TAG_Compound, "Data")
-	dataTag.SetPayload(dataPayload)
+	dataTag := nbt.MakeCompound("Data", dataElems)
 
 	t = nbt.MakeTag(nbt.TAG_Compound, "")
 	t.SetPayload([]nbt.Tag{dataTag})

@@ -3,75 +3,139 @@
 package world
 
 import (
-	"math"
+	"log"
 
 	"github.com/mathuin/terroir/nbt"
 )
 
+type FullByte [4096]byte
+type HalfByte [2048]byte
+
 type Section struct {
-	blocks   [4096]byte
-	addData  [4096]byte
-	blockSky [4096]byte
+	blocks   FullByte
+	addData  FullByte
+	blockSky FullByte
 }
 
-func Half(arrin [4096]byte, top bool) (arrout [2048]byte) {
-	for i, valin := range arrin {
-		var val byte
+func split(in byte) (byte, byte) {
+	return in >> 4, ((in << 4) >> 4)
+}
+
+func unsplit(top byte, bot byte) byte {
+	return top*16 + bot
+}
+
+func toHalf(inlow byte, inhigh byte) (outtop byte, outbot byte) {
+	inlowtop, inlowbot := split(inlow)
+	inhightop, inhighbot := split(inhigh)
+
+	outtop = unsplit(inhightop, inlowtop)
+	outbot = unsplit(inhighbot, inlowbot)
+	return
+}
+
+func toDouble(intop byte, inbot byte) (outlow byte, outhigh byte) {
+	intoptop, intopbot := split(intop)
+	inbottop, inbotbot := split(inbot)
+
+	outlow = unsplit(intopbot, inbotbot)
+	outhigh = unsplit(intoptop, inbottop)
+	return
+}
+
+func Half(arrin FullByte, top bool) (arrout HalfByte) {
+	for i := range arrout {
+		outtop, outbot := toHalf(arrin[i/2], arrin[i/2+1])
 		if top {
-			val = valin >> 4
+			arrout[i] = outtop
 		} else {
-			val = ((valin << 4) >> 4)
+			arrout[i] = outbot
 		}
-		if math.Mod(float64(i), 2) == 1 {
-			val = val << 4
-		}
-		halfi := i / 2
-		arrout[halfi] = arrout[halfi] + val
 	}
-	return arrout
+	return
 }
 
-func (s Section) add() [2048]byte {
+func Double(top HalfByte, bot HalfByte) (full FullByte) {
+	for i := range top {
+		di := i * 2
+		full[di], full[di+1] = toDouble(top[i], bot[i])
+	}
+	return
+}
+
+func (s Section) add() HalfByte {
 	return Half(s.addData, true)
 }
 
-func (s Section) data() [2048]byte {
+func (s Section) data() HalfByte {
 	return Half(s.addData, false)
 }
 
-func (s Section) blockLight() [2048]byte {
+func (s Section) blockLight() HalfByte {
 	return Half(s.blockSky, true)
 }
 
-func (s Section) skyLight() [2048]byte {
+func (s Section) skyLight() HalfByte {
 	return Half(s.blockSky, false)
 }
 
-func (s Section) write(y int) []nbt.Tag {
-	tarr := make([]nbt.Tag, 0)
+func (s Section) write(y int) nbt.Tag {
+	sElems := []nbt.CompoundElem{
+		{"Y", nbt.TAG_Byte, byte(y)},
+		{"Blocks", nbt.TAG_Byte_Array, s.blocks},
+		{"Add", nbt.TAG_Byte_Array, s.add()},
+		{"Data", nbt.TAG_Byte_Array, s.data()},
+		{"BlockLight", nbt.TAG_Byte_Array, s.blockLight()},
+		{"SkyLight", nbt.TAG_Byte_Array, s.skyLight()},
+	}
 
-	yTag := nbt.MakeTag(nbt.TAG_Byte, "Y")
-	yTag.SetPayload(byte(y))
+	sTag := nbt.MakeCompound("", sElems)
 
-	blocksTag := nbt.MakeTag(nbt.TAG_Byte_Array, "Blocks")
-	blocksTag.SetPayload(s.blocks)
-
-	addTag := nbt.MakeTag(nbt.TAG_Byte_Array, "Add")
-	addTag.SetPayload(s.add())
-	dataTag := nbt.MakeTag(nbt.TAG_Byte_Array, "Data")
-	dataTag.SetPayload(s.data())
-
-	blockLightTag := nbt.MakeTag(nbt.TAG_Byte_Array, "BlockLight")
-	blockLightTag.SetPayload(s.blockLight())
-	skyLightTag := nbt.MakeTag(nbt.TAG_Byte_Array, "SkyLight")
-	skyLightTag.SetPayload(s.skyLight())
-
-	return tarr
+	return sTag
 }
 
-// need to write something for reading sections!
+func (s *Section) read(t nbt.Tag) {
+	requiredTags := map[string]bool{
+		"Y":          false,
+		"Blocks":     false,
+		"Add":        false,
+		"Data":       false,
+		"BlockLight": false,
+		"SkyLight":   false,
+	}
+	var addTemp, dataTemp, blockTemp, skyTemp HalfByte
 
-// need to write func Double([2048]byte, [2048]byte) [4096]byte
+	for _, tval := range t.Payload.([]nbt.Tag) {
+		if _, ok := requiredTags[tval.Name]; ok {
+			requiredTags[tval.Name] = true
+			switch tval.Name {
+			case "Y":
+				// Y tags are checked on the chunk level.
+			case "Blocks":
+				s.blocks = tval.Payload.(FullByte)
+			case "Add":
+				addTemp = tval.Payload.(HalfByte)
+			case "Data":
+				dataTemp = tval.Payload.(HalfByte)
+			case "BlockLight":
+				blockTemp = tval.Payload.(HalfByte)
+			case "SkyLight":
+				skyTemp = tval.Payload.(HalfByte)
+			}
+		} else {
+			log.Fatalf("tag name %s not required for section", tval.Name)
+		}
+	}
+
+	for rtkey, rtval := range requiredTags {
+		if rtval == false {
+			log.Fatalf("tag name %s required for section but not found", rtkey)
+		}
+	}
+
+	s.addData = Double(addTemp, dataTemp)
+	s.blockSky = Double(blockTemp, skyTemp)
+}
 
 // Chunk coords here are "world-relative"
 type Chunk struct {
@@ -83,40 +147,81 @@ type Chunk struct {
 }
 
 func (c Chunk) write() nbt.Tag {
-	xPosTag := nbt.MakeTag(nbt.TAG_Int, "xPos")
-	xPosTag.SetPayload(c.xPos)
-	zPosTag := nbt.MakeTag(nbt.TAG_Int, "zPos")
-	zPosTag.SetPayload(c.zPos)
-	lastUpdateTag := nbt.MakeTag(nbt.TAG_Long, "LastUpdate")
-	lastUpdateTag.SetPayload(int64(0))
-	lightPopulatedTag := nbt.MakeTag(nbt.TAG_Byte, "LightPopulated")
-	lightPopulatedTag.SetPayload(byte(0))
-	terrainPopulatedTag := nbt.MakeTag(nbt.TAG_Byte, "TerrainPopulated")
-	terrainPopulatedTag.SetPayload(byte(1))
-	vTag := nbt.MakeTag(nbt.TAG_Byte, "V")
-	vTag.SetPayload(byte(1))
-	inhabitedTimeTag := nbt.MakeTag(nbt.TAG_Long, "InhabitedTime")
-	inhabitedTimeTag.SetPayload(int64(0))
-	biomesTag := nbt.MakeTag(nbt.TAG_Byte_Array, "Biomes")
-	biomesTag.SetPayload(c.biomes)
-	heightMapTag := nbt.MakeTag(nbt.TAG_Int_Array, "HeightMap")
-	heightMapTag.SetPayload(c.heightMap)
 
 	sectionsPayload := make([]interface{}, 16)
 	for i, s := range c.sections {
 		sectionsPayload[i] = s.write(i)
 	}
-	sectionsTag := nbt.MakeTag(nbt.TAG_List, "Sections")
-	sectionsTag.SetPayload(sectionsPayload)
 
-	// leaving the rest out for now...
+	var levelElems = []nbt.CompoundElem{
+		{"xPos", nbt.TAG_Int, c.xPos},
+		{"zPos", nbt.TAG_Int, c.zPos},
+		{"LastUpdate", nbt.TAG_Long, int64(0)},
+		{"LightPopulated", nbt.TAG_Byte, byte(0)},
+		{"TerrainPopulated", nbt.TAG_Byte, byte(1)},
+		{"V", nbt.TAG_Byte, byte(1)},
+		{"InhabitedTime", nbt.TAG_Long, int64(0)},
+		{"Biomes", nbt.TAG_Byte_Array, c.biomes},
+		{"HeightMap", nbt.TAG_Int_Array, c.heightMap},
+		{"Sections", nbt.TAG_List, sectionsPayload},
+	}
 
-	levelTag := nbt.MakeTag(nbt.TAG_Compound, "Level")
-	levelTagPayload := []nbt.Tag{xPosTag, zPosTag, lastUpdateTag, lightPopulatedTag, terrainPopulatedTag, vTag, inhabitedTimeTag, biomesTag, heightMapTag, sectionsTag}
-	levelTag.SetPayload(levelTagPayload)
+	levelTag := nbt.MakeCompound("Level", levelElems)
 
 	// not sure if this needs further wrapping or what...
 	return levelTag
 }
 
-// need to write something for reading chunks
+func (c *Chunk) read(tarr []nbt.Tag) {
+	requiredTags := map[string]bool{
+		"xPos":      false,
+		"zPos":      false,
+		"Biomes":    false,
+		"HeightMap": false,
+		"Sections":  false,
+	}
+	for _, tval := range tarr {
+		if _, ok := requiredTags[tval.Name]; ok {
+			requiredTags[tval.Name] = true
+			switch tval.Name {
+			case "xPos":
+				c.xPos = tval.Payload.(int32)
+			case "zPos":
+				c.zPos = tval.Payload.(int32)
+			case "Biomes":
+				c.biomes = tval.Payload.([256]byte)
+			case "HeightMap":
+				c.heightMap = tval.Payload.([256]int32)
+			case "Sections":
+				var yVals map[int]bool
+				for _, stag := range tval.Payload.([16]nbt.Tag) {
+					var yValFound bool
+					var yVal int
+					for _, subtags := range stag.Payload.([]nbt.Tag) {
+						if subtags.Name == "Y" {
+							yValFound = true
+							yVal = int(subtags.Payload.(byte))
+						}
+					}
+					if !yValFound {
+						panic("no yVal found")
+					}
+					if _, ok := yVals[yVal]; ok {
+						panic("yVal already found")
+					}
+					yVals[yVal] = true
+					c.sections[yVal].read(stag)
+				}
+			}
+		} else {
+			log.Fatalf("tag name %s not required for chunk", tval.Name)
+		}
+	}
+
+	for rtkey, rtval := range requiredTags {
+		if rtval == false {
+			log.Fatalf("tag name %s required for chunk but not found", rtkey)
+		}
+	}
+
+}

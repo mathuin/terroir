@@ -18,6 +18,7 @@ func Test_newLevel(t *testing.T) {
 	w.SetRandomSeed(prseed)
 	w.SetSpawn(px, py, pz)
 
+	// JMT: make this a map like the chunk read checker!
 	levelNameCheck := false
 	spawnXCheck := false
 	gameRulesCheck := false
