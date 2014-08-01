@@ -1,5 +1,54 @@
 # World notes
 
+## Level files
+
+The only file really required for a directory to be a Minecraft level!
+
+### Example
+
+```
+TAG_Compound(u''): 1 entries
+{
+  TAG_Compound(u'Data'): 23 entries
+  {
+    TAG_Byte(u'raining'): 0
+    TAG_Int(u'generatorVersion'): 1
+    TAG_Long(u'Time'): 4950
+    TAG_Int(u'GameType'): 0
+    TAG_String(u'generatorOptions'): u''
+    TAG_Byte(u'MapFeatures'): 1
+    TAG_String(u'generatorName'): u'default'
+    TAG_Byte(u'initialized'): 1
+    TAG_Byte(u'hardcore'): 0
+    TAG_Long(u'RandomSeed'): 2603059821051629081
+    TAG_Long(u'SizeOnDisk'): 0
+    TAG_Byte(u'allowCommands'): 0
+    TAG_Int(u'SpawnZ'): 220
+    TAG_Long(u'LastPlayed'): 1406080954413
+    TAG_Long(u'DayTime'): 4950
+    TAG_Compound(u'GameRules'): 9 entries
+    {
+      TAG_String(u'doTileDrops'): u'true'
+      TAG_String(u'doMobSpawning'): u'true'
+      TAG_String(u'keepInventory'): u'false'
+      TAG_String(u'naturalRegeneration'): u'true'
+      TAG_String(u'doDaylightCycle'): u'true'
+      TAG_String(u'doMobLoot'): u'true'
+      TAG_String(u'mobGriefing'): u'true'
+      TAG_String(u'doFireTick'): u'true'
+      TAG_String(u'commandBlockOutput'): u'true'
+    }
+    TAG_Int(u'SpawnY'): 64
+    TAG_Int(u'SpawnX'): -208
+    TAG_Int(u'thunderTime'): 98924
+    TAG_Int(u'version'): 19133
+    TAG_Int(u'rainTime'): 17092
+    TAG_Byte(u'thundering'): 0
+    TAG_String(u'LevelName'): u'ExampleWorld'
+  }
+}
+```
+
 ## Region files
 
 ### Coordinates
@@ -105,3 +154,4 @@ Compound "": root tag
   * List "Entities": list of Compounds (do I care)
   * List "TileEntities": list of Compounds (ditto)
   * List "TileTicks": may not exist (so it won't)
+
