@@ -12,25 +12,23 @@ type FullByte [4096]byte
 type HalfByte [2048]byte
 
 type Section struct {
-	blocks   FullByte
-	addData  FullByte
-	blockSky FullByte
+	blocks   []byte
+	addData  []byte
+	blockSky []byte
 }
 
-func (s Section) add() HalfByte {
-	return Half(s.addData, true)
+func NewSection() *Section {
+	if Debug {
+		log.Printf("NEW SECTION")
+	}
+	return &Section{blocks: make([]byte, 4096), addData: make([]byte, 4096), blockSky: make([]byte, 4096)}
 }
 
-func (s Section) data() HalfByte {
-	return Half(s.addData, false)
-}
-
-func (s Section) blockLight() HalfByte {
-	return Half(s.blockSky, true)
-}
-
-func (s Section) skyLight() HalfByte {
-	return Half(s.blockSky, false)
+func MakeSection() Section {
+	if Debug {
+		log.Printf("MAKE SECTION")
+	}
+	return Section{blocks: make([]byte, 4096), addData: make([]byte, 4096), blockSky: make([]byte, 4096)}
 }
 
 func (s Section) write(y int) nbt.Tag {
@@ -40,10 +38,6 @@ func (s Section) write(y int) nbt.Tag {
 	sElems := []nbt.CompoundElem{
 		{"Y", nbt.TAG_Byte, byte(y)},
 		{"Blocks", nbt.TAG_Byte_Array, s.blocks},
-		// {"Add", nbt.TAG_Byte_Array, s.add()},
-		// {"Data", nbt.TAG_Byte_Array, s.data()},
-		// {"BlockLight", nbt.TAG_Byte_Array, s.blockLight()},
-		// {"SkyLight", nbt.TAG_Byte_Array, s.skyLight()},
 		{"Add", nbt.TAG_Byte_Array, add},
 		{"Data", nbt.TAG_Byte_Array, data},
 		{"BlockLight", nbt.TAG_Byte_Array, blockLight},
@@ -56,41 +50,26 @@ func (s Section) write(y int) nbt.Tag {
 }
 
 func (s *Section) read(t nbt.Tag) {
-	requiredTags := map[string]bool{
-		"Y":          false,
-		"Blocks":     false,
-		"Add":        false,
-		"Data":       false,
-		"BlockLight": false,
-		"SkyLight":   false,
-	}
-	var addTemp, dataTemp, blockTemp, skyTemp HalfByte
+	addTemp := make([]byte, 2048)
+	dataTemp := make([]byte, 2048)
+	blockTemp := make([]byte, 2048)
+	skyTemp := make([]byte, 2048)
 
 	for _, tval := range t.Payload.([]nbt.Tag) {
-		if _, ok := requiredTags[tval.Name]; ok {
-			requiredTags[tval.Name] = true
-			switch tval.Name {
-			case "Y":
-				// Y tags are checked on the chunk level.
-			case "Blocks":
-				s.blocks = tval.Payload.(FullByte)
-			case "Add":
-				addTemp = tval.Payload.(HalfByte)
-			case "Data":
-				dataTemp = tval.Payload.(HalfByte)
-			case "BlockLight":
-				blockTemp = tval.Payload.(HalfByte)
-			case "SkyLight":
-				skyTemp = tval.Payload.(HalfByte)
-			}
-		} else {
+		switch tval.Name {
+		// Y tags are checked on the chunk level.
+		case "Blocks":
+			s.blocks = tval.Payload.([]byte)
+		case "Add":
+			addTemp = tval.Payload.([]byte)
+		case "Data":
+			dataTemp = tval.Payload.([]byte)
+		case "BlockLight":
+			blockTemp = tval.Payload.([]byte)
+		case "SkyLight":
+			skyTemp = tval.Payload.([]byte)
+		default:
 			log.Fatalf("tag name %s not required for section", tval.Name)
-		}
-	}
-
-	for rtkey, rtval := range requiredTags {
-		if rtval == false {
-			log.Fatalf("tag name %s required for section but not found", rtkey)
 		}
 	}
 
@@ -98,13 +77,35 @@ func (s *Section) read(t nbt.Tag) {
 	s.blockSky = Double(blockTemp, skyTemp)
 }
 
-// Chunk coords here are "world-relative"
+// JMT: learn more about coords to write better tests
 type Chunk struct {
 	xPos      int32
 	zPos      int32
-	biomes    [256]byte
-	heightMap [256]int32
-	sections  [16]Section
+	biomes    []byte
+	heightMap []int32
+	sections  []Section
+}
+
+func NewChunk(xPos int32, zPos int32) *Chunk {
+	if Debug {
+		log.Printf("NEW CHUNK: xPos %d, zPos %d", xPos, zPos)
+	}
+	sections := make([]Section, 0)
+	for i := 0; i < 16; i++ {
+		sections = append(sections, MakeSection())
+	}
+	return &Chunk{xPos: xPos, zPos: zPos, biomes: make([]byte, 256), heightMap: make([]int32, 256), sections: sections}
+}
+
+func MakeChunk(xPos int32, zPos int32) Chunk {
+	if Debug {
+		log.Printf("MAKE CHUNK: xPos %d, zPos %d", xPos, zPos)
+	}
+	sections := make([]Section, 0)
+	for i := 0; i < 16; i++ {
+		sections = append(sections, MakeSection())
+	}
+	return Chunk{xPos: xPos, zPos: zPos, biomes: make([]byte, 256), heightMap: make([]int32, 256), sections: sections}
 }
 
 func (c Chunk) write() nbt.Tag {
@@ -122,8 +123,8 @@ func (c Chunk) write() nbt.Tag {
 		{"TerrainPopulated", nbt.TAG_Byte, byte(1)},
 		{"V", nbt.TAG_Byte, byte(1)},
 		{"InhabitedTime", nbt.TAG_Long, int64(0)},
-		{"Biomes", nbt.TAG_Byte_Array, c.biomes},
-		{"HeightMap", nbt.TAG_Int_Array, c.heightMap},
+		{"Biomes", nbt.TAG_Byte_Array, []byte(c.biomes)},
+		{"HeightMap", nbt.TAG_Int_Array, []int32(c.heightMap)},
 		{"Sections", nbt.TAG_List, sectionsPayload},
 	}
 
@@ -150,12 +151,12 @@ func (c *Chunk) read(tarr []nbt.Tag) {
 			case "zPos":
 				c.zPos = tval.Payload.(int32)
 			case "Biomes":
-				c.biomes = tval.Payload.([256]byte)
+				c.biomes = tval.Payload.([]byte)
 			case "HeightMap":
-				c.heightMap = tval.Payload.([256]int32)
+				c.heightMap = tval.Payload.([]int32)
 			case "Sections":
 				var yVals map[int]bool
-				for _, stag := range tval.Payload.([16]nbt.Tag) {
+				for _, stag := range tval.Payload.([]nbt.Tag) {
 					var yValFound bool
 					var yVal int
 					for _, subtags := range stag.Payload.([]nbt.Tag) {

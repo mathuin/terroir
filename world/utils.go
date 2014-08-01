@@ -1,5 +1,10 @@
 package world
 
+import (
+	"log"
+	"math"
+)
+
 func split(in byte) (byte, byte) {
 	return in >> 4, ((in << 4) >> 4)
 }
@@ -26,7 +31,15 @@ func toDouble(intop byte, inbot byte) (outlow byte, outhigh byte) {
 	return
 }
 
-func Half(arrin FullByte, top bool) (arrout HalfByte) {
+func Half(arrin []byte, top bool) (arrout []byte) {
+	lenin := len(arrin)
+
+	if math.Mod(float64(lenin), 2) != 0 {
+		log.Panicf("lenin %d not even", lenin)
+	}
+
+	arrout = make([]byte, lenin/2)
+
 	for i := range arrout {
 		outtop, outbot := toHalf(arrin[i/2], arrin[i/2+1])
 		if top {
@@ -38,14 +51,32 @@ func Half(arrin FullByte, top bool) (arrout HalfByte) {
 	return
 }
 
-func Halve(arrin FullByte) (arrtop HalfByte, arrbot HalfByte) {
+func Halve(arrin []byte) (arrtop []byte, arrbot []byte) {
+	lenin := len(arrin)
+
+	if math.Mod(float64(lenin), 2) != 0 {
+		log.Panicf("lenin %d not even", lenin)
+	}
+
+	arrtop = make([]byte, lenin/2)
+	arrbot = make([]byte, lenin/2)
+
 	for i := range arrtop {
 		arrtop[i], arrbot[i] = toHalf(arrin[i/2], arrin[i/2+1])
 	}
 	return
 }
 
-func Double(top HalfByte, bot HalfByte) (full FullByte) {
+func Double(top []byte, bot []byte) (full []byte) {
+	lentop := len(top)
+	lenbot := len(bot)
+
+	if lentop != lenbot {
+		log.Panicf("lentop %d must equal lenbot %d")
+	}
+
+	full = make([]byte, lentop+lenbot)
+
 	for i := range top {
 		di := i * 2
 		full[di], full[di+1] = toDouble(top[i], bot[i])

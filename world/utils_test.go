@@ -1,6 +1,9 @@
 package world
 
-import "testing"
+import (
+	"bytes"
+	"testing"
+)
 
 var toHalf_tests = []struct {
 	inlow  byte
@@ -30,8 +33,10 @@ func Test_toDouble(t *testing.T) {
 }
 
 func Test_Half(t *testing.T) {
-	var arrin FullByte
-	var arrout, arrouttop, arroutbot HalfByte
+	arrin := make([]byte, 4096)
+	arrout := make([]byte, 2048)
+	arrouttop := make([]byte, 2048)
+	arroutbot := make([]byte, 2048)
 
 	for i := range arrin {
 		arrin[i] = 0x34
@@ -44,20 +49,21 @@ func Test_Half(t *testing.T) {
 
 	arrout = Half(arrin, true)
 
-	if arrout != arrouttop {
+	if !bytes.Equal(arrout, arrouttop) {
 		t.Errorf("Given %x and true, expected %x, got %x", arrin[0], arrouttop[0], arrout[0])
 	}
 
 	arrout = Half(arrin, false)
 
-	if arrout != arroutbot {
+	if !bytes.Equal(arrout, arroutbot) {
 		t.Errorf("Given %x and false, expected %x, got %x", arrin[0], arroutbot[0], arrout[0])
 	}
 }
 
 func Test_Halve(t *testing.T) {
-	var arrin FullByte
-	var arrouttop, arroutbot HalfByte
+	arrin := make([]byte, 4096)
+	arrouttop := make([]byte, 2048)
+	arroutbot := make([]byte, 2048)
 
 	for i := range arrin {
 		arrin[i] = 0x34
@@ -70,14 +76,16 @@ func Test_Halve(t *testing.T) {
 
 	arrtop, arrbot := Halve(arrin)
 
-	if arrtop != arrouttop || arrbot != arroutbot {
+	if !bytes.Equal(arrtop, arrouttop) || !bytes.Equal(arrbot, arroutbot) {
 		t.Errorf("Given %x, expected %x and %x, got %x and %x", arrin[0], arrouttop[0], arroutbot[0], arrtop[0], arrbot[0])
 	}
 }
 
 func Test_Double(t *testing.T) {
-	var arrout, arroutcheck FullByte
-	var arrintop, arrinbot HalfByte
+	arrout := make([]byte, 4096)
+	arroutcheck := make([]byte, 4096)
+	arrintop := make([]byte, 2048)
+	arrinbot := make([]byte, 2048)
 
 	for i := range arrintop {
 		arrintop[i] = 0x33
@@ -90,7 +98,7 @@ func Test_Double(t *testing.T) {
 
 	arrout = Double(arrintop, arrinbot)
 
-	if arrout != arroutcheck {
+	if !bytes.Equal(arrout, arroutcheck) {
 		t.Errorf("Given %x and %x, expected %x, got %x", arrintop[0], arrinbot[0], arroutcheck[0], arrout[0])
 	}
 }
