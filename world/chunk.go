@@ -49,14 +49,15 @@ func (s Section) write(y int) nbt.Tag {
 	return sTag
 }
 
-func (s *Section) read(t nbt.Tag) {
+func (s *Section) read(tarr []nbt.Tag) {
 	addTemp := make([]byte, 2048)
 	dataTemp := make([]byte, 2048)
 	blockTemp := make([]byte, 2048)
 	skyTemp := make([]byte, 2048)
 
-	for _, tval := range t.Payload.([]nbt.Tag) {
+	for _, tval := range tarr {
 		switch tval.Name {
+		case "Y":
 		// Y tags are checked on the chunk level.
 		case "Blocks":
 			s.blocks = tval.Payload.([]byte)
@@ -78,6 +79,8 @@ func (s *Section) read(t nbt.Tag) {
 }
 
 // JMT: learn more about coords to write better tests
+// coords are 0-31 for each, I think
+// since region files hold 32x32 chunks
 type Chunk struct {
 	xPos      int32
 	zPos      int32
@@ -134,7 +137,7 @@ func (c Chunk) write() nbt.Tag {
 	return levelTag
 }
 
-func (c *Chunk) read(tarr []nbt.Tag) {
+func (c *Chunk) Read(t nbt.Tag) {
 	requiredTags := map[string]bool{
 		"xPos":      false,
 		"zPos":      false,
@@ -142,8 +145,25 @@ func (c *Chunk) read(tarr []nbt.Tag) {
 		"HeightMap": false,
 		"Sections":  false,
 	}
-	for _, tval := range tarr {
+
+	if t.Type != nbt.TAG_Compound {
+		log.Panic("chunk read tag type not TAG_Compound!")
+	}
+
+	levelTag := t.Payload.([]nbt.Tag)[0]
+
+	if Debug {
+		log.Printf("Chunk Read 2: tag type %s name %s", nbt.Names[levelTag.Type], levelTag.Name)
+	}
+
+	for _, tval := range levelTag.Payload.([]nbt.Tag) {
+		if Debug {
+			log.Printf("tag type %s name %s found", nbt.Names[tval.Type], tval.Name)
+		}
 		if _, ok := requiredTags[tval.Name]; ok {
+			if Debug {
+				log.Printf(" -- tag is required")
+			}
 			requiredTags[tval.Name] = true
 			switch tval.Name {
 			case "xPos":
@@ -155,14 +175,14 @@ func (c *Chunk) read(tarr []nbt.Tag) {
 			case "HeightMap":
 				c.heightMap = tval.Payload.([]int32)
 			case "Sections":
-				var yVals map[int]bool
-				for _, stag := range tval.Payload.([]nbt.Tag) {
+				yVals := make(map[int]bool, 0)
+				for _, s := range tval.Payload.([][]nbt.Tag) {
 					var yValFound bool
 					var yVal int
-					for _, subtags := range stag.Payload.([]nbt.Tag) {
-						if subtags.Name == "Y" {
+					for _, subtag := range s {
+						if subtag.Name == "Y" {
 							yValFound = true
-							yVal = int(subtags.Payload.(byte))
+							yVal = int(subtag.Payload.(byte))
 						}
 					}
 					if !yValFound {
@@ -172,11 +192,11 @@ func (c *Chunk) read(tarr []nbt.Tag) {
 						panic("yVal already found")
 					}
 					yVals[yVal] = true
-					c.sections[yVal].read(stag)
+					c.sections[yVal].read(s)
 				}
 			}
-		} else {
-			log.Fatalf("tag name %s not required for chunk", tval.Name)
+			//		} else {
+			//			log.Fatalf("tag name %s not required for chunk", tval.Name)
 		}
 	}
 
