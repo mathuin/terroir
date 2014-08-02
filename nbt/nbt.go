@@ -55,7 +55,7 @@ func (t Tag) String() string {
 
 func (t *Tag) SetPayload(newp interface{}) error {
 	if Debug {
-		log.Printf("SET PAYLOAD: type %s, name %#v, payload %v (%T)", Names[t.Type], t.Name, newp, newp)
+		log.Printf("SET PAYLOAD: type %s, name %#v, payload type %T", Names[t.Type], t.Name, newp)
 	}
 	switch newp.(type) {
 	case byte:
@@ -110,6 +110,11 @@ func (t *Tag) SetPayload(newp interface{}) error {
 		}
 	// JMT: this must be at the bottom because it's a wildcard effectively
 	case interface{}:
+		if t.Type == TAG_List {
+			t.Payload = newp
+			return nil
+		}
+	case nil:
 		if t.Type == TAG_List {
 			t.Payload = newp
 			return nil
@@ -383,16 +388,18 @@ var LReaders = map[byte]ListReader{
 	},
 }
 
-func readCompound(r io.Reader) (interface{}, error) {
+func readCompound(r io.Reader) (i interface{}, err error) {
+	// must return interface{} since it may be called from a list
 	payload := []Tag{}
-	var emptytag Tag
-	for newtag, err := ReadTag(r); newtag != emptytag; newtag, err = ReadTag(r) {
+	var newtag, emptytag Tag
+	for newtag, err = ReadTag(r); newtag != emptytag; newtag, err = ReadTag(r) {
 		if err != nil {
-			return nil, err
+			break
 		}
 		payload = append(payload, newtag)
 	}
-	return payload, nil
+	i = payload
+	return
 }
 
 func writeCompound(w io.Writer, i interface{}) error {
@@ -579,6 +586,10 @@ func ReadTag(r io.Reader) (Tag, error) {
 	}
 	tname := tnamei.(string)
 
+	if Debug {
+		log.Printf("ReadTag: type %s name %s", Names[ttype], tname)
+	}
+
 	var payload interface{}
 	switch ttype {
 	case TAG_List:
@@ -597,6 +608,8 @@ func ReadTag(r io.Reader) (Tag, error) {
 				t = MakeTag(ttype, tname)
 				err = t.SetPayload(payload)
 			}
+		} else {
+			err = fmt.Errorf("no PReader found for type %s", Names[ttype])
 		}
 	}
 	return t, err
