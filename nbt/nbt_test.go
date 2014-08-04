@@ -27,7 +27,7 @@ var tag_tests = []struct {
 func Test_WriteTag(t *testing.T) {
 	for _, tt := range tag_tests {
 		var b bytes.Buffer
-		err := WriteTag(&b, tt.input)
+		err := tt.input.Write(&b)
 		if err != nil {
 			t.Fail()
 		}

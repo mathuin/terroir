@@ -405,7 +405,7 @@ func readCompound(r io.Reader) (i interface{}, err error) {
 func writeCompound(w io.Writer, i interface{}) error {
 	tags := append(i.([]Tag), MakeTag(TAG_End, ""))
 	for _, tag := range tags {
-		if err := WriteTag(w, tag); err != nil {
+		if err := tag.Write(w); err != nil {
 			return err
 		}
 	}
@@ -615,11 +615,11 @@ func ReadTag(r io.Reader) (Tag, error) {
 	return t, err
 }
 
-func WriteTag(w io.Writer, t Tag) (err error) {
+func (t Tag) Write(w io.Writer) error {
 	PWriters[TAG_Byte](w, t.Type)
 
 	if t.Type == TAG_End {
-		return
+		return nil
 	}
 
 	PWriters[TAG_String](w, t.Name)
@@ -627,15 +627,15 @@ func WriteTag(w io.Writer, t Tag) (err error) {
 	// JMT: initialization loop issue here too
 	switch t.Type {
 	case TAG_List:
-		err = writeList(w, t.Payload)
+		return writeList(w, t.Payload)
 	case TAG_Compound:
-		err = writeCompound(w, t.Payload)
+		return writeCompound(w, t.Payload)
 	default:
 		if val, ok := PWriters[t.Type]; ok {
-			err = val(w, t.Payload)
+			return val(w, t.Payload)
 		} else {
-			err = fmt.Errorf("unknown tag")
+			return fmt.Errorf("unknown tag")
 		}
 	}
-	return
+	return nil
 }

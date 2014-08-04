@@ -44,7 +44,7 @@ func WriteCompressedFile(filename string, t Tag) error {
 	}
 	defer defClose(outf)
 	f := gzip.NewWriter(outf)
-	if err := WriteTag(f, t); err != nil {
+	if err := t.Write(f); err != nil {
 		return err
 	}
 	f.Close()
@@ -57,5 +57,5 @@ func WriteUncompressedFile(filename string, t Tag) error {
 		return err
 	}
 	defer defClose(f)
-	return WriteTag(f, t)
+	return t.Write(f)
 }
