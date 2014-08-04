@@ -4,9 +4,13 @@ package world
 
 import (
 	"fmt"
+	"io/ioutil"
 	"log"
 	"os"
 	"path"
+	"strings"
+
+	"github.com/mathuin/terroir/nbt"
 )
 
 var Debug = false
@@ -83,4 +87,54 @@ func (w World) Write(dir string) error {
 	}
 
 	return nil
+}
+
+func ReadWorld(dir string, name string) (*World, error) {
+	// does dir exist?
+	if _, err := os.Stat(dir); err != nil {
+		if os.IsNotExist(err) {
+			return nil, fmt.Errorf("save dir does not exist")
+		} else {
+			return nil, err
+		}
+	}
+	// does dir+name exist?
+	worldDir := path.Join(dir, name)
+	if _, err := os.Stat(worldDir); err != nil {
+		if os.IsNotExist(err) {
+			return nil, fmt.Errorf("world dir does not exist")
+		} else {
+			return nil, err
+		}
+	}
+	// does dir+name+region exist?
+	regionDir := path.Join(worldDir, "region")
+	if _, err := os.Stat(regionDir); err != nil {
+		if os.IsNotExist(err) {
+			return nil, fmt.Errorf("region dir does not exist")
+		} else {
+			return nil, err
+		}
+	}
+	// read level file
+	levelFile := path.Join(worldDir, "level.dat")
+	levelTag, err := nbt.ReadCompressedFile(levelFile)
+	if err != nil {
+		return nil, err
+	}
+	_ = levelTag
+	// make a new world
+	w := NewWorld(name)
+	// for file in region dir
+	rd, err := ioutil.ReadDir(regionDir)
+	if err != nil {
+		return nil, err
+	}
+	for _, fi := range rd {
+		if strings.HasSuffix(fi.Name(), "mca") {
+			// read file and import chunks
+		}
+	}
+
+	return w, nil
 }

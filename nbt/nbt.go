@@ -116,12 +116,13 @@ func (t *Tag) SetPayload(newp interface{}) error {
 		}
 	case nil:
 		if t.Type == TAG_List {
-			t.Payload = newp
+			var i interface{}
+			t.Payload = i
 			return nil
 		}
 	}
 	// only set payload if appropriate for this type
-	return fmt.Errorf("type %s does not match payload %v (%T)", Names[t.Type], newp, newp)
+	return fmt.Errorf("type %s does not match payload %T", Names[t.Type], newp)
 }
 
 var Names = map[byte]string{
