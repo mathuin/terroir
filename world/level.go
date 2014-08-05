@@ -47,9 +47,9 @@ func (w World) level() (t nbt.Tag, err error) {
 		{"MapFeatures", nbt.TAG_Byte, byte(1)},
 		{"RandomSeed", nbt.TAG_Long, w.randomSeed},
 		{"SizeOnDisk", nbt.TAG_Long, int64(0)},
-		{"SpawnX", nbt.TAG_Int, w.spawnX},
-		{"SpawnY", nbt.TAG_Int, w.spawnY},
-		{"SpawnZ", nbt.TAG_Int, w.spawnZ},
+		{"SpawnX", nbt.TAG_Int, w.spawn.X},
+		{"SpawnY", nbt.TAG_Int, w.spawn.Y},
+		{"SpawnZ", nbt.TAG_Int, w.spawn.Z},
 		{"Time", nbt.TAG_Long, int64(0)},
 	}
 	dataTag := nbt.MakeCompound("Data", dataElems)

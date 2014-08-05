@@ -14,52 +14,50 @@ import (
 )
 
 var Debug = false
+var NowDebug = false
 
 type World struct {
 	Name       string
-	spawnX     int32
-	spawnY     int32
-	spawnZ     int32
+	spawn      Point
 	spawnSet   bool
 	randomSeed int64
+	chunkMap   map[string]Chunk
 }
 
 func NewWorld(Name string) *World {
 	if Debug {
-		log.Printf("NEW WORLD: %s\n", Name)
+		log.Printf("NEW WORLD: %s", Name)
 	}
 	return &World{Name: Name}
 }
 
 func MakeWorld(Name string) World {
 	if Debug {
-		log.Printf("MAKE WORLD: %s\n", Name)
+		log.Printf("MAKE WORLD: %s", Name)
 	}
 	return World{Name: Name}
 }
 
 func (w World) String() string {
-	return fmt.Sprintf("World{Name: %s, Spawn: (%d, %d, %d), RandomSeed: %d}", w.Name, w.spawnX, w.spawnY, w.spawnZ, w.randomSeed)
+	return fmt.Sprintf("World{Name: %s, Spawn: %v, RandomSeed: %d}", w.Name, w.spawn, w.randomSeed)
 }
 
 func (w *World) SetRandomSeed(seed int64) {
 	if Debug {
-		log.Printf("SET SEED: %s: %d\n", w.Name, seed)
+		log.Printf("SET SEED: %s: %d", w.Name, seed)
 	}
 	w.randomSeed = seed
 }
 
-func (w *World) SetSpawn(x int32, y int32, z int32) {
+func (w *World) SetSpawn(p Point) {
 	if Debug {
 		if w.spawnSet {
-			log.Printf("CHANGE SPAWN: %s: from (%d, %d, %d) to (%d, %d, %d)\n", w.Name, w.spawnX, w.spawnY, w.spawnZ, x, y, z)
+			log.Printf("CHANGE SPAWN: %s: from (%d, %d, %d) to (%d, %d, %d)", w.Name, w.spawn.X, w.spawn.Y, w.spawn.Z, p.X, p.Y, p.Z)
 		} else {
-			log.Printf("SET SPAWN: %s: (%d, %d, %d)\n", w.Name, x, y, z)
+			log.Printf("SET SPAWN: %s: (%d, %d, %d)", w.Name, p.X, p.Y, p.Z)
 		}
 	}
-	w.spawnX = x
-	w.spawnY = y
-	w.spawnZ = z
+	w.spawn = p
 	w.spawnSet = true
 }
 

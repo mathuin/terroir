@@ -392,10 +392,8 @@ var LReaders = map[byte]ListReader{
 func readCompound(r io.Reader) (i interface{}, err error) {
 	// must return interface{} since it may be called from a list
 	payload := []Tag{}
-	var newtag Tag
-	endtag := MakeTag(TAG_End, "")
-	// read the first one
-	for newtag, err = ReadTag(r); newtag != endtag; newtag, err = ReadTag(r) {
+	var newtag, emptytag Tag
+	for newtag, err = ReadTag(r); newtag != emptytag; newtag, err = ReadTag(r) {
 		if err != nil {
 			break
 		}
@@ -459,6 +457,9 @@ func readList(r io.Reader) (i interface{}, err error) {
 
 // JMT: not sure if this can be normalized due to type thing
 func writeList(w io.Writer, i interface{}) error {
+	if Debug {
+		log.Printf("writeList: i %T", i)
+	}
 	var tsub byte
 	var tlen int32
 	var tout bytes.Buffer
@@ -562,6 +563,8 @@ func writeList(w io.Writer, i interface{}) error {
 				return err
 			}
 		}
+	default:
+		return fmt.Errorf("Interface of type %T does not match valid list entries", i)
 	}
 	if err := PWriters[TAG_Byte](w, tsub); err != nil {
 		return err

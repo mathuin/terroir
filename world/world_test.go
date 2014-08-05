@@ -16,16 +16,17 @@ import (
 //   - directory created under temp with correct name
 //   - existence of level.dat in said directory
 
-func Test_WriteWOrld(t *testing.T) {
+func Test_WriteWorld(t *testing.T) {
 	pname := "ExampleLevel"
 	px := int32(-208)
 	py := int32(64)
 	pz := int32(220)
+	ppt := MakePoint(px, py, pz)
 	prseed := int64(2603059821051629081)
 
 	w := MakeWorld(pname)
 	w.SetRandomSeed(prseed)
-	w.SetSpawn(px, py, pz)
+	w.SetSpawn(ppt)
 
 	td, err := ioutil.TempDir("", "")
 	defer os.RemoveAll(td)

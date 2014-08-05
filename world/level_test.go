@@ -12,11 +12,12 @@ func Test_newLevel(t *testing.T) {
 	px := int32(-208)
 	py := int32(64)
 	pz := int32(220)
+	ppt := MakePoint(px, py, pz)
 	prseed := int64(2603059821051629081)
 
 	w := MakeWorld(pname)
 	w.SetRandomSeed(prseed)
-	w.SetSpawn(px, py, pz)
+	w.SetSpawn(ppt)
 
 	requiredTags := map[string]bool{
 		"LevelName":  false,

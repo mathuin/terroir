@@ -17,11 +17,7 @@ func Test_sectionWrite(t *testing.T) {
 		s.blockSky[i] = 0x34
 	}
 
-	sTag := s.write(1)
-
-	if sTag.Type != nbt.TAG_Compound {
-		t.Errorf("section tab not of type TAG_Compound")
-	}
+	sTagPayload := s.write(1)
 
 	requiredTags := map[string]bool{
 		"Y":          false,
@@ -32,7 +28,7 @@ func Test_sectionWrite(t *testing.T) {
 		"SkyLight":   false,
 	}
 
-	for _, tag := range sTag.Payload.([]nbt.Tag) {
+	for _, tag := range sTagPayload {
 		if _, ok := requiredTags[tag.Name]; ok {
 			requiredTags[tag.Name] = true
 			switch tag.Name {
@@ -94,25 +90,34 @@ func Test_chunkWrite(t *testing.T) {
 		c.heightMap[i] = cheightMap[i]
 	}
 
-	for i, s := range c.sections {
-		// internals of sections are tested elsewhere
+	for i := 0; i < 16; i++ {
+		s := MakeSection()
 		for j := range s.blocks {
 			s.blocks[j] = 0x30 & byte(i)
 			s.addData[j] = 0x12
 			s.blockSky[j] = 0x34
 		}
+		c.sections[i] = s
 	}
 
-	Debug = true
 	cTag := c.write()
-	Debug = false
 
 	if cTag.Type != nbt.TAG_Compound {
 		t.Errorf("chunk tab not of type TAG_Compound")
 	}
 
-	if cTag.Name != "Level" {
-		t.Errorf("chunk tag not named Level")
+	if cTag.Name != "" {
+		t.Errorf("chunk tag not unnamed")
+	}
+
+	lTag := cTag.Payload.([]nbt.Tag)[0]
+
+	if lTag.Type != nbt.TAG_Compound {
+		t.Errorf("level tag not of type TAG_Compound")
+	}
+
+	if lTag.Name != "Level" {
+		t.Errorf("level tag not named Level")
 	}
 
 	requiredTags := map[string]bool{
@@ -126,9 +131,11 @@ func Test_chunkWrite(t *testing.T) {
 		"Biomes":           false,
 		"HeightMap":        false,
 		"Sections":         false,
+		"Entities":         false,
+		"TileEntities":     false,
 	}
 
-	for _, tag := range cTag.Payload.([]nbt.Tag) {
+	for _, tag := range lTag.Payload.([]nbt.Tag) {
 		if _, ok := requiredTags[tag.Name]; ok {
 			requiredTags[tag.Name] = true
 			switch tag.Name {
@@ -151,7 +158,7 @@ func Test_chunkWrite(t *testing.T) {
 				// sections are checked elsewhere
 			}
 		} else {
-			log.Fatalf("tag name %s not required for section", tag.Name)
+			log.Fatalf("tag name %s not required for chunk", tag.Name)
 		}
 	}
 }

@@ -43,6 +43,10 @@ func ReadEntity(tags []nbt.Tag) Entity {
 	return e
 }
 
+func (e Entity) write() []nbt.Tag {
+	return e.tags
+}
+
 // TileEntity is a TAG_Compound
 // TileEntities is a TAG_List of TAG_Compound
 // (unless none exist, in which case it is a TAG_List of <nil>)
@@ -75,6 +79,10 @@ func ReadTileEntity(tags []nbt.Tag) TileEntity {
 	return e
 }
 
+func (te TileEntity) write() []nbt.Tag {
+	return te.tags
+}
+
 // TileTick is a TAG_Compound
 // TileTicks TAG_List of TAG_Compound
 // (unless none exist, in which case no tag is sent)
@@ -103,14 +111,14 @@ func (t TileTick) String() string {
 	return fmt.Sprintf("TileTick{ID: %d, Time: %d, Order: %d, Point: %v}", t.id, t.time, t.order, t.point)
 }
 
-func (t TileTick) write() nbt.Tag {
+func (tt TileTick) write() nbt.Tag {
 	ttElems := []nbt.CompoundElem{
-		{"i", nbt.TAG_Int, t.id},
-		{"t", nbt.TAG_Int, t.time},
-		{"p", nbt.TAG_Int, t.order},
-		{"x", nbt.TAG_Int, t.point.X},
-		{"y", nbt.TAG_Int, t.point.Y},
-		{"z", nbt.TAG_Int, t.point.Z},
+		{"i", nbt.TAG_Int, tt.id},
+		{"t", nbt.TAG_Int, tt.time},
+		{"p", nbt.TAG_Int, tt.order},
+		{"x", nbt.TAG_Int, tt.point.X},
+		{"y", nbt.TAG_Int, tt.point.Y},
+		{"z", nbt.TAG_Int, tt.point.Z},
 	}
 
 	ttTag := nbt.MakeCompound("", ttElems)
