@@ -58,6 +58,9 @@ func Test_WriteWorld(t *testing.T) {
 }
 
 func Test_Two(t *testing.T) {
+	if testing.Short() {
+		t.Skip("skipping test in short mode")
+	}
 	saveDir := "."
 	worldName := "TerroirTest"
 	newWorldName := "TerroirTwo"
