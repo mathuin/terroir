@@ -24,12 +24,12 @@ func Test_NewMakePoint(t *testing.T) {
 	}
 }
 
-func Test_WhichChunk(t *testing.T) {
+func Test_ChunkXZ(t *testing.T) {
 	for _, tt := range point_tests {
 		p := MakePoint(tt.X, tt.Y, tt.Z)
-		cx, cz := p.WhichChunk()
-		if cx != tt.CX || cz != tt.CZ {
-			t.Errorf("Given %d, %d, %d, wanted %d, %d, got %d, %d", tt.X, tt.Y, tt.Z, tt.CX, tt.CZ, cx, cz)
+		ttXZ := p.ChunkXZ()
+		if ttXZ.X != tt.CX || ttXZ.Z != tt.CZ {
+			t.Errorf("Given %d, %d, %d, wanted %d, %d, got %d, %d", tt.X, tt.Y, tt.Z, tt.CX, tt.CZ, ttXZ.X, ttXZ.Z)
 		}
 	}
 }

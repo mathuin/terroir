@@ -30,15 +30,12 @@ func (p Point) String() string {
 	return fmt.Sprintf("Point{X: %d, Y: %d, Z: %d}", p.X, p.Y, p.Z)
 }
 
-// currently returns chunk *coordinates*
-func (p Point) WhichChunk() (cx int32, cz int32) {
-	cx = int32(math.Floor(float64(p.X) / 16.0))
-	cz = int32(math.Floor(float64(p.Z) / 16.0))
-	return
+func floor16(in int32) int32 {
+	return int32(math.Floor(float64(in) / 16.0))
 }
 
-func (p Point) WhichChunkXZ() XZ {
-	return XZ{X: int32(math.Floor(float64(p.X) / 16.0)), Z: int32(math.Floor(float64(p.Z) / 16.0))}
+func (p Point) ChunkXZ() XZ {
+	return XZ{X: floor16(p.X), Z: floor16(p.Z)}
 }
 
 type Location struct {

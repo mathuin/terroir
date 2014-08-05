@@ -81,14 +81,12 @@ func Test_Two(t *testing.T) {
 		nw.RegionMap[k] = v
 	}
 
-	// what is the value of the block at 0, 60, 0 ?
-	// haven't done that yet!
-	pt := MakePoint(0, 60, 0)
-	// what is its value now
-	// bval := nw.Block(pt)
-	// set it to obsidian
+	// set two points to obsidian
 	obsidian := 49
+	pt := MakePoint(0, 60, 0)
+	pt2 := MakePoint(1, 60, 0)
 	nw.SetBlock(pt, obsidian)
+	nw.SetBlock(pt2, obsidian)
 
 	newSaveDir, nerr := ioutil.TempDir("", "")
 	if nerr != nil {
@@ -108,8 +106,12 @@ func Test_Two(t *testing.T) {
 
 	// check value of some particular block
 	nbval := sw.Block(pt)
+	nb2val := sw.Block(pt2)
 
 	if nbval != obsidian {
 		t.Errorf("nbval %v is not equal to obsidian %v", nbval, obsidian)
+	}
+	if nb2val != obsidian {
+		t.Errorf("nb2val %v is not equal to obsidian %v", nb2val, obsidian)
 	}
 }

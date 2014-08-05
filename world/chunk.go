@@ -5,7 +5,6 @@ package world
 import (
 	"fmt"
 	"log"
-	"math"
 
 	"github.com/mathuin/terroir/nbt"
 )
@@ -70,7 +69,7 @@ func (pt Point) Index() int {
 }
 
 func (w World) Section(pt Point) Section {
-	return w.ChunkMap[pt.WhichChunkXZ()].Sections[int(math.Floor(float64(pt.Y)/16.0))]
+	return w.ChunkMap[pt.ChunkXZ()].Sections[int(floor16(pt.Y))]
 }
 
 func (s Section) write(y int) []nbt.Tag {
