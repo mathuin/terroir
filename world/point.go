@@ -30,8 +30,8 @@ func (p Point) String() string {
 	return fmt.Sprintf("Point{X: %d, Y: %d, Z: %d}", p.X, p.Y, p.Z)
 }
 
-func floor16(in int32) int32 {
-	return int32(math.Floor(float64(in) / 16.0))
+func (pt Point) Index() int {
+	return int(pt.X%16 + pt.Z%16*16 + pt.Y%16*16*16)
 }
 
 func (p Point) ChunkXZ() XZ {

@@ -13,32 +13,139 @@ import (
 	"log"
 	"math"
 	"os"
+	"path"
 	"time"
 
 	"github.com/mathuin/terroir/nbt"
 )
 
-type Region struct {
-	xCoord int32
-	zCoord int32
-	chunks map[string]Chunk
-}
+func (w *World) ReadRegion(r io.ReadSeeker, xCoord int32, zCoord int32) (int, error) {
+	numchunks := 0
 
-func NewRegion(xCoord int32, zCoord int32) *Region {
-	if Debug {
-		log.Printf("NEW REGION: xCoord %d, zCoord %d", xCoord, zCoord)
+	// build the data structures
+	locations := make([]int32, 1024)
+	timestamps := make([]int32, 1024)
+
+	// populate them
+	err := binary.Read(r, binary.BigEndian, locations)
+	if err != nil {
+		return numchunks, err
 	}
-	return &Region{xCoord: xCoord, zCoord: zCoord, chunks: make(map[string]Chunk, 0)}
-}
-
-func MakeRegion(xCoord int32, zCoord int32) Region {
-	if Debug {
-		log.Printf("MAKE REGION: xCoord %d, zCoord %d", xCoord, zCoord)
+	err = binary.Read(r, binary.BigEndian, timestamps)
+	if err != nil {
+		return numchunks, err
 	}
-	return Region{xCoord: xCoord, zCoord: zCoord, chunks: make(map[string]Chunk, 0)}
+
+	for i := 0; i < 1024; i++ {
+		// coordinates
+		x := int(xCoord)*32 + i%32
+		z := int(zCoord)*32 + i/32
+
+		offcount := locations[i]
+		offsetval := offcount / 256
+		countval := offcount % 256
+		timestamp := timestamps[i]
+		if timestamp > 0 || offsetval > 0 || countval > 0 {
+			if Debug {
+				log.Printf("[%d, %d]", x, z)
+				log.Printf("  offset %d sectors (%d bytes)", offsetval, offsetval*4096)
+				log.Printf("  count %d sectors (%d bytes)", countval, countval*4096)
+				log.Printf("  timestamp %d", timestamp)
+			}
+			pos, perr := r.Seek(int64(offsetval*4096), os.SEEK_SET)
+			if perr != nil {
+				panic(perr)
+			}
+			if Debug {
+				log.Printf("Current seek position (read) %d", pos)
+			}
+			var chunklen int32
+			err = binary.Read(r, binary.BigEndian, &chunklen)
+			if err != nil {
+				return numchunks, err
+			}
+			if Debug {
+				log.Printf("Actual read: %d bytes (%d bytes padding)", chunklen, (countval*4096 - chunklen))
+			}
+			flag := make([]uint8, 1)
+			_, err = io.ReadFull(r, flag)
+			if err != nil {
+				return numchunks, err
+			}
+			zchr := make([]byte, chunklen)
+			var zr, unzr io.Reader
+			zr = bytes.NewBuffer(zchr)
+			ret, err := io.ReadFull(r, zchr)
+			if err != nil {
+				return numchunks, err
+			}
+			if Debug {
+				log.Printf("%d compressed bytes read", ret)
+			}
+			if Debug {
+				log.Printf("Compression:")
+			}
+			switch flag[0] {
+			case 0:
+				if Debug {
+					log.Printf("  none?")
+				}
+				unzr = zr
+			case 1:
+				if Debug {
+					log.Printf("  gzip")
+				}
+				unzr, err = gzip.NewReader(zr)
+				if err != nil {
+					return numchunks, err
+				}
+			case 2:
+				if Debug {
+					log.Printf("  zlib")
+				}
+				unzr, err = zlib.NewReader(zr)
+				if err != nil {
+					return numchunks, err
+				}
+			}
+			zstr, err := ioutil.ReadAll(unzr)
+			if err != nil {
+				return numchunks, err
+			}
+			if Debug {
+				log.Printf("uncompressed len %d", len(zstr))
+			}
+			writeNotParse := false
+			var tag nbt.Tag
+			tmpchunk := MakeChunk(int32(x), int32(z))
+			if writeNotParse {
+				writeFileName := fmt.Sprintf("chunk.%d.%d.dat", x, z)
+				err = ioutil.WriteFile(writeFileName, zstr, 0755)
+				if err != nil {
+					return numchunks, err
+				}
+				if Debug {
+					log.Println(writeFileName)
+				}
+			} else {
+				zb := bytes.NewBuffer(zstr)
+				tag, err = nbt.ReadTag(zb)
+				if err != nil {
+					return numchunks, err
+				}
+				tmpchunk.Read(tag)
+			}
+			cXZ := XZ{X: tmpchunk.xPos, Z: tmpchunk.zPos}
+			w.ChunkMap[cXZ] = tmpchunk
+			rXZ := XZ{X: int32(math.Floor(float64(cXZ.X) / 32.0)), Z: int32(math.Floor(float64(cXZ.Z) / 32.0))}
+			w.RegionMap[rXZ] = append(w.RegionMap[rXZ], cXZ)
+			numchunks = numchunks + 1
+		}
+	}
+	return numchunks, nil
 }
 
-func (r *Region) Write(w io.Writer) error {
+func (w *World) WriteRegion(dir string, key XZ) error {
 	cb := new(bytes.Buffer)
 	locations := make([]int32, 1024)
 	timestamps := make([]int32, 1024)
@@ -46,12 +153,12 @@ func (r *Region) Write(w io.Writer) error {
 	zlibcomp[0] = byte(2)
 	offset := int32(2)
 
-	// for each chunk in chunks list
 	numchunks := 0
-	for k, c := range r.chunks {
+	for _, v := range w.RegionMap[key] {
 		if Debug {
-			log.Printf("Writing %s...", k)
+			log.Printf("Writing %d, %d...", v.X, v.Z)
 		}
+		c := w.ChunkMap[v]
 		cx := c.xPos % 32
 		if cx < 0 {
 			cx = cx + 32
@@ -134,7 +241,7 @@ func (r *Region) Write(w io.Writer) error {
 
 		}
 		if int32(posa-posb) != count*4096 {
-			log.Panicf("posa for %d, %d is %d -- not even multiple of 4096!", cx, cz, posa)
+			return fmt.Errorf("posa for %d, %d is %d -- not even multiple of 4096!", cx, cz, posa)
 		}
 
 		// - write current time to timestamp array
@@ -151,187 +258,37 @@ func (r *Region) Write(w io.Writer) error {
 		offset = offset + count
 		numchunks = numchunks + 1
 	}
+
+	// open actual region file for writing
+	rfn := fmt.Sprintf("r.%d.%d.mca", key.X, key.Z)
+	rname := path.Join(dir, rfn)
+	if Debug {
+		log.Printf("Writing region file %s...", rname)
+	}
+	iow, err := os.Create(rname)
+	if err != nil {
+		return err
+	}
+	defer iow.Close()
+
 	// write locations array to real io.writer
-	err := binary.Write(w, binary.BigEndian, locations)
+	err = binary.Write(iow, binary.BigEndian, locations)
 	if err != nil {
 		return err
 	}
 
 	// write timestamps array to real io.writer
-	err = binary.Write(w, binary.BigEndian, timestamps)
+	err = binary.Write(iow, binary.BigEndian, timestamps)
 	if err != nil {
 		return err
 	}
 	// write chunks writer to real io.writer
-	_, err = cb.WriteTo(w)
+	_, err = cb.WriteTo(iow)
 	if err != nil {
 		return err
 	}
-	return err
-}
-
-func ReadRegion(r io.ReadSeeker, xCoord int32, zCoord int32) (*Region, error) {
-	region := NewRegion(xCoord, zCoord)
-
-	// build the data structures
-	locations := make([]int32, 1024)
-	timestamps := make([]int32, 1024)
-
-	// populate them
-	err := binary.Read(r, binary.BigEndian, locations)
-	if err != nil {
-		return nil, err
-	}
-	err = binary.Read(r, binary.BigEndian, timestamps)
-	if err != nil {
-		return nil, err
-	}
-
-	for i := 0; i < 1024; i++ {
-		// coordinates
-		x := int(xCoord)*32 + i%32
-		z := int(zCoord)*32 + i/32
-
-		offcount := locations[i]
-		offsetval := offcount / 256
-		countval := offcount % 256
-		timestamp := timestamps[i]
-		if timestamp > 0 || offsetval > 0 || countval > 0 {
-			if Debug {
-				log.Printf("[%d, %d]", x, z)
-				log.Printf("  offset %d sectors (%d bytes)", offsetval, offsetval*4096)
-				log.Printf("  count %d sectors (%d bytes)", countval, countval*4096)
-				log.Printf("  timestamp %d", timestamp)
-			}
-			pos, perr := r.Seek(int64(offsetval*4096), os.SEEK_SET)
-			if perr != nil {
-				panic(perr)
-			}
-			if Debug {
-				log.Printf("Current seek position (read) %d", pos)
-			}
-			var chunklen int32
-			err = binary.Read(r, binary.BigEndian, &chunklen)
-			if err != nil {
-				return nil, err
-			}
-			if Debug {
-				log.Printf("Actual read: %d bytes (%d bytes padding)", chunklen, (countval*4096 - chunklen))
-			}
-			flag := make([]uint8, 1)
-			_, err = io.ReadFull(r, flag)
-			if err != nil {
-				return nil, err
-			}
-			zchr := make([]byte, chunklen)
-			var zr, unzr io.Reader
-			zr = bytes.NewBuffer(zchr)
-			ret, err := io.ReadFull(r, zchr)
-			if err != nil {
-				return nil, err
-			}
-			if Debug {
-				log.Printf("%d compressed bytes read", ret)
-			}
-			if Debug {
-				log.Printf("Compression:")
-			}
-			switch flag[0] {
-			case 0:
-				if Debug {
-					log.Printf("  none?")
-				}
-				unzr = zr
-			case 1:
-				if Debug {
-					log.Printf("  gzip")
-				}
-				unzr, err = gzip.NewReader(zr)
-				if err != nil {
-					return nil, err
-				}
-			case 2:
-				if Debug {
-					log.Printf("  zlib")
-				}
-				unzr, err = zlib.NewReader(zr)
-				if err != nil {
-					return nil, err
-				}
-			}
-			zstr, err := ioutil.ReadAll(unzr)
-			if err != nil {
-				return nil, err
-			}
-			if Debug {
-				log.Printf("uncompressed len %d", len(zstr))
-			}
-			writeNotParse := false
-			var tag nbt.Tag
-			tmpchunk := MakeChunk(int32(x), int32(z))
-			if writeNotParse {
-				writeFileName := fmt.Sprintf("chunk.%d.%d.dat", x, z)
-				err = ioutil.WriteFile(writeFileName, zstr, 0755)
-				if err != nil {
-					return nil, err
-				}
-				if Debug {
-					log.Println(writeFileName)
-				}
-			} else {
-				zb := bytes.NewBuffer(zstr)
-				tag, err = nbt.ReadTag(zb)
-				if err != nil {
-					return nil, err
-				}
-				tmpchunk.Read(tag)
-			}
-			region.chunks[tmpchunk.Name()] = tmpchunk
-		}
-	}
-	return region, nil
-}
-
-func (r *Region) ReplaceBlock(from byte, to byte) int {
-	count := 0
-	for _, c := range r.chunks {
-		for _, s := range c.Sections {
-			for i := range s.Blocks {
-				if s.Blocks[i] == from {
-					count = count + 1
-					s.Blocks[i] = to
-				}
-			}
-		}
-	}
-	return count
-}
-
-func (r Region) Compare(newr Region) error {
-	// compare xCoord and yCoord
-	if r.xCoord != newr.xCoord || r.zCoord != newr.zCoord {
-		return fmt.Errorf("region coordinates do not match!")
-	}
-
-	// check chunks
-	for i, nc := range newr.chunks {
-		if c, ok := r.chunks[i]; ok {
-			newrtag := nc.write()
-			newrtop := newrtag.Payload.([]nbt.Tag)[0].Payload.([]nbt.Tag)[0]
-			rtag := c.write()
-			rtop := rtag.Payload.([]nbt.Tag)[0].Payload.([]nbt.Tag)[0]
-			if newrtop != rtop {
-				return fmt.Errorf("chunks do not match!")
-			}
-		} else {
-			return fmt.Errorf("r[%s] does not exist", i)
-		}
-	}
-	// other way round
-	for i := range r.chunks {
-		if _, ok := newr.chunks[i]; !ok {
-			return fmt.Errorf("newr[%s] does not exist", i)
-		}
+	if Debug {
+		log.Printf("... wrote %d chunks", numchunks)
 	}
 	return nil
 }

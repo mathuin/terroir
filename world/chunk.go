@@ -46,26 +46,44 @@ func (s Section) String() string {
 	return fmt.Sprintf("Section{}")
 }
 
-func Nibble(arr []byte, i int) byte {
-	if i%2 == 0 {
-		return arr[i/2] & 0x0F
-	}
-	return arr[i/2] & 0xF0
+func (w *World) Block(pt Point) int {
+	s := w.Section(pt)
+	base := int(s.Blocks[pt.Index()])
+	add := int(Nibble(s.Add, pt.Index()))
+	return base + add*256
 }
 
-func WriteNibble(arr []byte, i int, b byte) {
-	var newb byte
-	if i%2 == 0 {
-		newb = b & 0x0F
-	} else {
-		newb = (b & 0xF0) >> 4
-	}
-	arr[i/2] = newb
+func (w *World) SetBlock(pt Point, b int) {
+	base := byte(b % 256)
+	add := byte(b / 256)
+	s := w.Section(pt)
+	i := pt.Index()
+	s.Blocks[i] = byte(base)
+	WriteNibble(s.Add, i, add)
 }
 
-// index into 4096-byte array based on point
-func (pt Point) Index() int {
-	return int(pt.X%16 + pt.Z%16*16 + pt.Y%16*16*16)
+func (w *World) Data(pt Point) byte {
+	return Nibble(w.Section(pt).Data, pt.Index())
+}
+
+func (w *World) SetData(pt Point, b byte) {
+	WriteNibble(w.Section(pt).Data, pt.Index(), b)
+}
+
+func (w *World) BlockLight(pt Point) byte {
+	return Nibble(w.Section(pt).BlockLight, pt.Index())
+}
+
+func (w *World) SetBlockLight(pt Point, b byte) {
+	WriteNibble(w.Section(pt).BlockLight, pt.Index(), b)
+}
+
+func (w *World) SkyLight(pt Point) byte {
+	return Nibble(w.Section(pt).SkyLight, pt.Index())
+}
+
+func (w *World) SetSkyLight(pt Point, b byte) {
+	WriteNibble(w.Section(pt).SkyLight, pt.Index(), b)
 }
 
 func (w World) Section(pt Point) Section {
