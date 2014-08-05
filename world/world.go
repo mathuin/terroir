@@ -8,7 +8,8 @@ import (
 	"log"
 	"os"
 	"path"
-	"strings"
+	"regexp"
+	"strconv"
 
 	"github.com/mathuin/terroir/nbt"
 )
@@ -124,14 +125,35 @@ func ReadWorld(dir string, name string) (*World, error) {
 	// make a new world
 	w := NewWorld(name)
 	// for file in region dir
+	regionRE, err := regexp.Compile("r\\.(-?\\d*)\\.(-?\\d*)\\.mca")
 	rd, err := ioutil.ReadDir(regionDir)
 	if err != nil {
 		return nil, err
 	}
 	for _, fi := range rd {
-		if strings.HasSuffix(fi.Name(), "mca") {
-			// read file and import chunks
+		matches := regionRE.FindAllStringSubmatch(fi.Name(), -1)
+		if matches == nil {
+			continue
 		}
+		match := matches[0]
+		mfn := match[0]
+		outx, xerr := strconv.ParseInt(match[1], 10, 32)
+		if xerr != nil {
+			panic(xerr)
+		}
+		outz, zerr := strconv.ParseInt(match[2], 10, 32)
+		if zerr != nil {
+			panic(zerr)
+		}
+		rname := path.Join(regionDir, mfn)
+		log.Printf("regionfile name %s", rname)
+		r, rerr := os.Open(rname)
+		if rerr != nil {
+			panic(rerr)
+		}
+		defer r.Close()
+		wooregion := ReadRegion(r, int32(outx), int32(outz))
+		_ = wooregion
 	}
 
 	return w, nil
