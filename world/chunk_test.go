@@ -11,10 +11,14 @@ func Test_sectionWrite(t *testing.T) {
 	s := NewSection()
 
 	// populate it
-	for i := range s.blocks {
-		s.blocks[i] = 0x31
-		s.addData[i] = 0x12
-		s.blockSky[i] = 0x34
+	for i := range s.Blocks {
+		s.Blocks[i] = 0x31
+	}
+	for i := range s.Add {
+		s.Add[i] = 0x12
+		s.Data[i] = 0x34
+		s.BlockLight[i] = 0x56
+		s.SkyLight[i] = 0x78
 	}
 
 	sTagPayload := s.write(1)
@@ -41,19 +45,19 @@ func Test_sectionWrite(t *testing.T) {
 					t.Errorf("Block value does not match")
 				}
 			case "Add":
-				if tag.Payload.([]byte)[0] != 0x11 {
+				if tag.Payload.([]byte)[0] != 0x12 {
 					t.Errorf("Add value does not match")
 				}
 			case "Data":
-				if tag.Payload.([]byte)[0] != 0x22 {
+				if tag.Payload.([]byte)[0] != 0x34 {
 					t.Errorf("Data value does not match")
 				}
 			case "BlockLight":
-				if tag.Payload.([]byte)[0] != 0x33 {
+				if tag.Payload.([]byte)[0] != 0x56 {
 					t.Errorf("BlockLight value does not match")
 				}
 			case "SkyLight":
-				if tag.Payload.([]byte)[0] != 0x44 {
+				if tag.Payload.([]byte)[0] != 0x78 {
 					t.Errorf("SkyLight value does not match")
 				}
 			}
@@ -92,12 +96,16 @@ func Test_chunkWrite(t *testing.T) {
 
 	for i := 0; i < 16; i++ {
 		s := MakeSection()
-		for j := range s.blocks {
-			s.blocks[j] = 0x30 & byte(i)
-			s.addData[j] = 0x12
-			s.blockSky[j] = 0x34
+		for j := range s.Blocks {
+			s.Blocks[j] = 0x30 & byte(i)
 		}
-		c.sections[i] = s
+		for j := range s.Add {
+			s.Add[j] = 0x12
+			s.Data[j] = 0x34
+			s.BlockLight[j] = 0x56
+			s.SkyLight[j] = 0x78
+		}
+		c.Sections[i] = s
 	}
 
 	cTag := c.write()

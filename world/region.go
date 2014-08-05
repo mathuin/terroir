@@ -38,7 +38,7 @@ func MakeRegion(xCoord int32, zCoord int32) Region {
 	return Region{xCoord: xCoord, zCoord: zCoord, chunks: make(map[string]Chunk, 0)}
 }
 
-func (r *Region) Write(w io.Writer) {
+func (r *Region) Write(w io.Writer) error {
 	cb := new(bytes.Buffer)
 	locations := make([]int32, 1024)
 	timestamps := make([]int32, 1024)
@@ -70,7 +70,7 @@ func (r *Region) Write(w io.Writer) {
 		zw := zlib.NewWriter(&zb)
 		ct := c.write()
 		if err := ct.Write(zw); err != nil {
-			panic(err)
+			return err
 		}
 		zw.Close()
 
@@ -79,21 +79,21 @@ func (r *Region) Write(w io.Writer) {
 		ccl := int32(zb.Len() + 1)
 		count := int32(math.Ceil(float64(ccl) / 4096.0))
 		pad := int32(4096*count) - ccl - 4
-
-		if pad > 4096 {
-			log.Printf("ccl %d count %d pad %d", ccl, count, pad)
-			log.Panic("Too much padding somehow!")
-		}
-		if (int(ccl+pad+4) % 4096) != 0 {
-			log.Printf("ccl %d count %d pad %d", ccl, count, pad)
-			log.Printf("sum %d should be %d", (ccl + pad + 4), count*4096)
-			log.Panic("Not an even page size!")
-		}
+		whole := int(ccl + pad + 4)
 
 		if Debug {
 			log.Printf("Length of compressed chunk: %d", ccl)
 			log.Printf("Count of sectors: %d", count)
 			log.Printf("Padding: %d", pad)
+			log.Printf("Whole amount written: %d", whole)
+		}
+
+		if pad > 4096 {
+			return fmt.Errorf("pad %d > 4096", pad)
+		}
+
+		if (whole % 4096) != 0 {
+			return fmt.Errorf("%d not even multiple of 4096", whole)
 		}
 
 		posb := cb.Len()
@@ -103,28 +103,28 @@ func (r *Region) Write(w io.Writer) {
 		}
 		posshould := (offset - 2) * 4096
 		if posb != int(posshould) {
-			log.Panicf("posb for chunk %d is %d but should be %d!", numchunks, posb, posshould)
+			return fmt.Errorf("posb for chunk %d is %d but should be %d!", numchunks, posb, posshould)
 		}
 
 		// - write chunk header and compressed chunk data to chunk writer
 		err := binary.Write(cb, binary.BigEndian, ccl)
 		if err != nil {
-			panic(err)
+			return err
 		}
 		_, err = cb.Write(zlibcomp)
 		if err != nil {
-			panic(err)
+			return err
 		}
 		_, err = zb.WriteTo(cb)
 		if err != nil {
-			panic(err)
+			return err
 		}
 
 		// - write necessary padding of zeroes to chunks writer
 		padb := make([]byte, pad)
 		_, err = cb.Write(padb)
 		if err != nil {
-			panic(err)
+			return err
 		}
 
 		posa := cb.Len()
@@ -154,22 +154,23 @@ func (r *Region) Write(w io.Writer) {
 	// write locations array to real io.writer
 	err := binary.Write(w, binary.BigEndian, locations)
 	if err != nil {
-		panic(err)
+		return err
 	}
 
 	// write timestamps array to real io.writer
 	err = binary.Write(w, binary.BigEndian, timestamps)
 	if err != nil {
-		panic(err)
+		return err
 	}
 	// write chunks writer to real io.writer
 	_, err = cb.WriteTo(w)
 	if err != nil {
-		panic(err)
+		return err
 	}
+	return err
 }
 
-func ReadRegion(r io.ReadSeeker, xCoord int32, zCoord int32) *Region {
+func ReadRegion(r io.ReadSeeker, xCoord int32, zCoord int32) (*Region, error) {
 	region := NewRegion(xCoord, zCoord)
 
 	// build the data structures
@@ -179,11 +180,11 @@ func ReadRegion(r io.ReadSeeker, xCoord int32, zCoord int32) *Region {
 	// populate them
 	err := binary.Read(r, binary.BigEndian, locations)
 	if err != nil {
-		panic(err)
+		return nil, err
 	}
 	err = binary.Read(r, binary.BigEndian, timestamps)
 	if err != nil {
-		panic(err)
+		return nil, err
 	}
 
 	for i := 0; i < 1024; i++ {
@@ -212,7 +213,7 @@ func ReadRegion(r io.ReadSeeker, xCoord int32, zCoord int32) *Region {
 			var chunklen int32
 			err = binary.Read(r, binary.BigEndian, &chunklen)
 			if err != nil {
-				panic(err)
+				return nil, err
 			}
 			if Debug {
 				log.Printf("Actual read: %d bytes (%d bytes padding)", chunklen, (countval*4096 - chunklen))
@@ -220,14 +221,14 @@ func ReadRegion(r io.ReadSeeker, xCoord int32, zCoord int32) *Region {
 			flag := make([]uint8, 1)
 			_, err = io.ReadFull(r, flag)
 			if err != nil {
-				panic(err)
+				return nil, err
 			}
 			zchr := make([]byte, chunklen)
 			var zr, unzr io.Reader
 			zr = bytes.NewBuffer(zchr)
 			ret, err := io.ReadFull(r, zchr)
 			if err != nil {
-				panic(err)
+				return nil, err
 			}
 			if Debug {
 				log.Printf("%d compressed bytes read", ret)
@@ -247,7 +248,7 @@ func ReadRegion(r io.ReadSeeker, xCoord int32, zCoord int32) *Region {
 				}
 				unzr, err = gzip.NewReader(zr)
 				if err != nil {
-					panic(err)
+					return nil, err
 				}
 			case 2:
 				if Debug {
@@ -255,12 +256,12 @@ func ReadRegion(r io.ReadSeeker, xCoord int32, zCoord int32) *Region {
 				}
 				unzr, err = zlib.NewReader(zr)
 				if err != nil {
-					panic(err)
+					return nil, err
 				}
 			}
 			zstr, err := ioutil.ReadAll(unzr)
 			if err != nil {
-				panic(err)
+				return nil, err
 			}
 			if Debug {
 				log.Printf("uncompressed len %d", len(zstr))
@@ -272,7 +273,7 @@ func ReadRegion(r io.ReadSeeker, xCoord int32, zCoord int32) *Region {
 				writeFileName := fmt.Sprintf("chunk.%d.%d.dat", x, z)
 				err = ioutil.WriteFile(writeFileName, zstr, 0755)
 				if err != nil {
-					panic(err)
+					return nil, err
 				}
 				if Debug {
 					log.Println(writeFileName)
@@ -281,24 +282,24 @@ func ReadRegion(r io.ReadSeeker, xCoord int32, zCoord int32) *Region {
 				zb := bytes.NewBuffer(zstr)
 				tag, err = nbt.ReadTag(zb)
 				if err != nil {
-					panic(err)
+					return nil, err
 				}
 				tmpchunk.Read(tag)
 			}
 			region.chunks[tmpchunk.Name()] = tmpchunk
 		}
 	}
-	return region
+	return region, nil
 }
 
 func (r *Region) ReplaceBlock(from byte, to byte) int {
 	count := 0
 	for _, c := range r.chunks {
-		for _, s := range c.sections {
-			for i := range s.blocks {
-				if s.blocks[i] == from {
+		for _, s := range c.Sections {
+			for i := range s.Blocks {
+				if s.Blocks[i] == from {
 					count = count + 1
-					s.blocks[i] = to
+					s.Blocks[i] = to
 				}
 			}
 		}

@@ -4,6 +4,7 @@ package world
 
 import (
 	"fmt"
+	"log"
 	"path"
 
 	"github.com/mathuin/terroir/nbt"
@@ -45,11 +46,11 @@ func (w World) level() (t nbt.Tag, err error) {
 		{"LastPlayed", nbt.TAG_Long, int64(0)},
 		{"LevelName", nbt.TAG_String, w.Name},
 		{"MapFeatures", nbt.TAG_Byte, byte(1)},
-		{"RandomSeed", nbt.TAG_Long, w.randomSeed},
+		{"RandomSeed", nbt.TAG_Long, w.RandomSeed},
 		{"SizeOnDisk", nbt.TAG_Long, int64(0)},
-		{"SpawnX", nbt.TAG_Int, w.spawn.X},
-		{"SpawnY", nbt.TAG_Int, w.spawn.Y},
-		{"SpawnZ", nbt.TAG_Int, w.spawn.Z},
+		{"SpawnX", nbt.TAG_Int, w.Spawn.X},
+		{"SpawnY", nbt.TAG_Int, w.Spawn.Y},
+		{"SpawnZ", nbt.TAG_Int, w.Spawn.Z},
 		{"Time", nbt.TAG_Long, int64(0)},
 	}
 	dataTag := nbt.MakeCompound("Data", dataElems)
@@ -68,5 +69,8 @@ func (w World) writelevel(dir string) error {
 		return err
 	}
 	levelFile := path.Join(dir, "level.dat")
+	if Debug {
+		log.Printf("Writing level file %s", levelFile)
+	}
 	return nbt.WriteCompressedFile(levelFile, levelTag)
 }

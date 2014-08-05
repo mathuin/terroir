@@ -11,11 +11,6 @@ import (
 	"github.com/mathuin/terroir/nbt"
 )
 
-// test writeworld
-// - check for:
-//   - directory created under temp with correct name
-//   - existence of level.dat in said directory
-
 func Test_WriteWorld(t *testing.T) {
 	pname := "ExampleLevel"
 	px := int32(-208)
@@ -60,4 +55,61 @@ func Test_WriteWorld(t *testing.T) {
 
 	// That's it!  contents of file are tested elsewhere...
 	_ = levelTag
+}
+
+func Test_Two(t *testing.T) {
+	saveDir := "."
+	worldName := "TerroirTest"
+	newWorldName := "TerroirTwo"
+
+	w, err := ReadWorld(saveDir, worldName)
+	if err != nil {
+		t.Fail()
+	}
+
+	nw := MakeWorld(newWorldName)
+
+	// copy all but the name
+	nw.SetSpawn(w.Spawn)
+	nw.SetRandomSeed(w.RandomSeed)
+
+	for k, v := range w.ChunkMap {
+		nw.ChunkMap[k] = v
+	}
+
+	for k, v := range w.RegionMap {
+		nw.RegionMap[k] = v
+	}
+
+	// what is the value of the block at 0, 60, 0 ?
+	// haven't done that yet!
+	pt := MakePoint(0, 60, 0)
+	// what is its value now
+	// bval := nw.Block(pt)
+	// set it to obsidian
+	obsidian := 49
+	nw.SetBlock(pt, obsidian)
+
+	newSaveDir, nerr := ioutil.TempDir("", "")
+	if nerr != nil {
+		panic(nerr)
+	}
+	defer os.RemoveAll(newSaveDir)
+
+	if err := nw.Write(newSaveDir); err != nil {
+		t.Fail()
+	}
+
+	// read it back
+	sw, serr := ReadWorld(newSaveDir, newWorldName)
+	if serr != nil {
+		t.Fail()
+	}
+
+	// check value of some particular block
+	nbval := sw.Block(pt)
+
+	if nbval != obsidian {
+		t.Errorf("nbval %v is not equal to obsidian %v", nbval, obsidian)
+	}
 }

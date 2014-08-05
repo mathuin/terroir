@@ -5,52 +5,82 @@ package world
 import (
 	"fmt"
 	"log"
+	"math"
 
 	"github.com/mathuin/terroir/nbt"
 )
 
 type Section struct {
 	// These are likely to move to world
-	blocks   []byte
-	addData  []byte
-	blockSky []byte
+	Blocks     []byte
+	Add        []byte
+	Data       []byte
+	BlockLight []byte
+	SkyLight   []byte
 }
 
 func NewSection() *Section {
 	if Debug {
 		log.Printf("NEW SECTION")
 	}
-	blocks := make([]byte, 4096)
-	addData := make([]byte, 4096)
-	blockSky := make([]byte, 4096)
-	return &Section{blocks: blocks, addData: addData, blockSky: blockSky}
+	Blocks := make([]byte, 4096)
+	Add := make([]byte, 2048)
+	Data := make([]byte, 2048)
+	BlockLight := make([]byte, 2048)
+	SkyLight := make([]byte, 2048)
+	return &Section{Blocks: Blocks, Add: Add, Data: Data, BlockLight: BlockLight, SkyLight: SkyLight}
 }
 
 func MakeSection() Section {
 	if Debug {
 		log.Printf("MAKE SECTION")
 	}
-	blocks := make([]byte, 4096)
-	addData := make([]byte, 4096)
-	blockSky := make([]byte, 4096)
-	return Section{blocks: blocks, addData: addData, blockSky: blockSky}
+	Blocks := make([]byte, 4096)
+	Add := make([]byte, 2048)
+	Data := make([]byte, 2048)
+	BlockLight := make([]byte, 2048)
+	SkyLight := make([]byte, 2048)
+	return Section{Blocks: Blocks, Add: Add, Data: Data, BlockLight: BlockLight, SkyLight: SkyLight}
 }
 
 func (s Section) String() string {
 	return fmt.Sprintf("Section{}")
 }
 
-func (s Section) write(y int) []nbt.Tag {
-	add, data := Halve(s.addData)
-	blockLight, skyLight := Halve(s.blockSky)
+func Nibble(arr []byte, i int) byte {
+	if i%2 == 0 {
+		return arr[i/2] & 0x0F
+	}
+	return arr[i/2] & 0xF0
+}
 
+func WriteNibble(arr []byte, i int, b byte) {
+	var newb byte
+	if i%2 == 0 {
+		newb = b & 0x0F
+	} else {
+		newb = (b & 0xF0) >> 4
+	}
+	arr[i/2] = newb
+}
+
+// index into 4096-byte array based on point
+func (pt Point) Index() int {
+	return int(pt.X%16 + pt.Z%16*16 + pt.Y%16*16*16)
+}
+
+func (w World) Section(pt Point) Section {
+	return w.ChunkMap[pt.WhichChunkXZ()].Sections[int(math.Floor(float64(pt.Y)/16.0))]
+}
+
+func (s Section) write(y int) []nbt.Tag {
 	sElems := []nbt.CompoundElem{
 		{"Y", nbt.TAG_Byte, byte(y)},
-		{"Blocks", nbt.TAG_Byte_Array, s.blocks},
-		{"Add", nbt.TAG_Byte_Array, add},
-		{"Data", nbt.TAG_Byte_Array, data},
-		{"BlockLight", nbt.TAG_Byte_Array, blockLight},
-		{"SkyLight", nbt.TAG_Byte_Array, skyLight},
+		{"Blocks", nbt.TAG_Byte_Array, s.Blocks},
+		{"Add", nbt.TAG_Byte_Array, s.Add},
+		{"Data", nbt.TAG_Byte_Array, s.Data},
+		{"BlockLight", nbt.TAG_Byte_Array, s.BlockLight},
+		{"SkyLight", nbt.TAG_Byte_Array, s.SkyLight},
 	}
 
 	sTagPayload := nbt.MakeCompoundPayload(sElems)
@@ -60,32 +90,25 @@ func (s Section) write(y int) []nbt.Tag {
 
 func ReadSection(tarr []nbt.Tag) Section {
 	s := MakeSection()
-	addTemp := make([]byte, 2048)
-	dataTemp := make([]byte, 2048)
-	blockTemp := make([]byte, 2048)
-	skyTemp := make([]byte, 2048)
 
 	for _, tval := range tarr {
 		switch tval.Name {
 		case "Y":
 		// Y tags are checked on the chunk level.
 		case "Blocks":
-			s.blocks = tval.Payload.([]byte)
+			s.Blocks = tval.Payload.([]byte)
 		case "Add":
-			addTemp = tval.Payload.([]byte)
+			s.Add = tval.Payload.([]byte)
 		case "Data":
-			dataTemp = tval.Payload.([]byte)
+			s.Data = tval.Payload.([]byte)
 		case "BlockLight":
-			blockTemp = tval.Payload.([]byte)
+			s.BlockLight = tval.Payload.([]byte)
 		case "SkyLight":
-			skyTemp = tval.Payload.([]byte)
+			s.SkyLight = tval.Payload.([]byte)
 		default:
 			log.Fatalf("tag name %s not required for section", tval.Name)
 		}
 	}
-
-	s.addData = Double(addTemp, dataTemp)
-	s.blockSky = Double(blockTemp, skyTemp)
 
 	return s
 }
@@ -95,7 +118,7 @@ type Chunk struct {
 	zPos      int32
 	biomes    []byte
 	heightMap []int32
-	sections  map[int]Section
+	Sections  map[int]Section
 	// living things
 	entities     []Entity
 	tileEntities []TileEntity
@@ -108,11 +131,11 @@ func NewChunk(xPos int32, zPos int32) *Chunk {
 	}
 	biomes := make([]byte, 256)
 	heightMap := make([]int32, 256)
-	sections := map[int]Section{}
+	Sections := map[int]Section{}
 	entities := []Entity{}
 	tileEntities := []TileEntity{}
 	tileTicks := []TileTick{}
-	return &Chunk{xPos: xPos, zPos: zPos, biomes: biomes, heightMap: heightMap, sections: sections, entities: entities, tileEntities: tileEntities, tileTicks: tileTicks}
+	return &Chunk{xPos: xPos, zPos: zPos, biomes: biomes, heightMap: heightMap, Sections: Sections, entities: entities, tileEntities: tileEntities, tileTicks: tileTicks}
 }
 
 func MakeChunk(xPos int32, zPos int32) Chunk {
@@ -121,11 +144,11 @@ func MakeChunk(xPos int32, zPos int32) Chunk {
 	}
 	biomes := make([]byte, 256)
 	heightMap := make([]int32, 256)
-	sections := map[int]Section{}
+	Sections := map[int]Section{}
 	entities := []Entity{}
 	tileEntities := []TileEntity{}
 	tileTicks := []TileTick{}
-	return Chunk{xPos: xPos, zPos: zPos, biomes: biomes, heightMap: heightMap, sections: sections, entities: entities, tileEntities: tileEntities, tileTicks: tileTicks}
+	return Chunk{xPos: xPos, zPos: zPos, biomes: biomes, heightMap: heightMap, Sections: Sections, entities: entities, tileEntities: tileEntities, tileTicks: tileTicks}
 }
 
 func (c Chunk) Name() string {
@@ -135,7 +158,7 @@ func (c Chunk) Name() string {
 func (c Chunk) write() nbt.Tag {
 
 	sectionsPayload := [][]nbt.Tag{}
-	for i, s := range c.sections {
+	for i, s := range c.Sections {
 		st := s.write(i)
 		sectionsPayload = append(sectionsPayload, st)
 	}
@@ -254,10 +277,10 @@ func (c *Chunk) Read(t nbt.Tag) {
 					if !yValFound {
 						panic("no yVal found")
 					}
-					if _, ok := c.sections[yVal]; ok {
+					if _, ok := c.Sections[yVal]; ok {
 						panic("yVal already found")
 					}
-					c.sections[yVal] = ReadSection(s)
+					c.Sections[yVal] = ReadSection(s)
 				}
 			case "Entities":
 				if tval.Payload != nil {

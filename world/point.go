@@ -37,6 +37,10 @@ func (p Point) WhichChunk() (cx int32, cz int32) {
 	return
 }
 
+func (p Point) WhichChunkXZ() XZ {
+	return XZ{X: int32(math.Floor(float64(p.X) / 16.0)), Z: int32(math.Floor(float64(p.Z) / 16.0))}
+}
+
 type Location struct {
 	X float64
 	Y float64
