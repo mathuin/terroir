@@ -19,6 +19,6 @@ func WriteNibble(arr []byte, i int, b byte) {
 	}
 }
 
-func floor16(in int32) int32 {
-	return int32(math.Floor(float64(in) / 16.0))
+func floor(in int32, base int32) int32 {
+	return int32(math.Floor(float64(in) / float64(base)))
 }

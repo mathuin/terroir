@@ -115,29 +115,17 @@ func (w *World) ReadRegion(r io.ReadSeeker, xCoord int32, zCoord int32) (int, er
 			if Debug {
 				log.Printf("uncompressed len %d", len(zstr))
 			}
-			writeNotParse := false
 			var tag nbt.Tag
 			tmpchunk := MakeChunk(int32(x), int32(z))
-			if writeNotParse {
-				writeFileName := fmt.Sprintf("chunk.%d.%d.dat", x, z)
-				err = ioutil.WriteFile(writeFileName, zstr, 0755)
-				if err != nil {
-					return numchunks, err
-				}
-				if Debug {
-					log.Println(writeFileName)
-				}
-			} else {
-				zb := bytes.NewBuffer(zstr)
-				tag, err = nbt.ReadTag(zb)
-				if err != nil {
-					return numchunks, err
-				}
-				tmpchunk.Read(tag)
+			zb := bytes.NewBuffer(zstr)
+			tag, err = nbt.ReadTag(zb)
+			if err != nil {
+				return numchunks, err
 			}
+			tmpchunk.Read(tag)
 			cXZ := XZ{X: tmpchunk.xPos, Z: tmpchunk.zPos}
 			w.ChunkMap[cXZ] = tmpchunk
-			rXZ := XZ{X: int32(math.Floor(float64(cXZ.X) / 32.0)), Z: int32(math.Floor(float64(cXZ.Z) / 32.0))}
+			rXZ := XZ{X: floor(cXZ.X, 32), Z: floor(cXZ.Z, 32)}
 			w.RegionMap[rXZ] = append(w.RegionMap[rXZ], cXZ)
 			numchunks = numchunks + 1
 		}

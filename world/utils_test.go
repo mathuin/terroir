@@ -43,20 +43,24 @@ func Test_WriteNibble(t *testing.T) {
 	}
 }
 
-var floor16_tests = []struct {
-	in  int32
-	out int32
+var floor_tests = []struct {
+	in   int32
+	base int32
+	out  int32
 }{
-	{3, 0},
-	{21, 1},
-	{-3, -1},
+	{3, 16, 0},
+	{21, 16, 1},
+	{-3, 16, -1},
+	{3, 32, 0},
+	{21, 32, 0},
+	{-3, 32, -1},
 }
 
-func Test_floor16(t *testing.T) {
-	for _, tt := range floor16_tests {
-		out := floor16(tt.in)
+func Test_floor(t *testing.T) {
+	for _, tt := range floor_tests {
+		out := floor(tt.in, tt.base)
 		if out != tt.out {
-			t.Errorf("Given %v, expected %v, got %v", tt.in, tt.out, out)
+			t.Errorf("Given %v and %v, expected %v, got %v", tt.in, tt.base, tt.out, out)
 		}
 	}
 }

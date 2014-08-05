@@ -19,13 +19,6 @@ type Entity struct {
 	tags []nbt.Tag
 }
 
-func NewEntity() *Entity {
-	if Debug {
-		log.Printf("NEW ENTITY")
-	}
-	return &Entity{}
-}
-
 func MakeEntity() Entity {
 	if Debug {
 		log.Printf("MAKE ENTITY")
@@ -53,13 +46,6 @@ func (e Entity) write() []nbt.Tag {
 
 type TileEntity struct {
 	tags []nbt.Tag
-}
-
-func NewTileEntity() *TileEntity {
-	if Debug {
-		log.Printf("NEW TILEENTITY")
-	}
-	return &TileEntity{}
 }
 
 func MakeTileEntity() TileEntity {
@@ -91,13 +77,6 @@ type TileTick struct {
 	time  int32
 	order int32
 	point Point
-}
-
-func NewTileTick() *TileTick {
-	if Debug {
-		log.Printf("NEW TILETICK")
-	}
-	return &TileTick{}
 }
 
 func MakeTileTick() TileTick {

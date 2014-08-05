@@ -30,15 +30,6 @@ type World struct {
 	RegionMap  map[XZ][]XZ
 }
 
-func NewWorld(Name string) *World {
-	if Debug {
-		log.Printf("NEW WORLD: %s", Name)
-	}
-	ChunkMap := map[XZ]Chunk{}
-	RegionMap := map[XZ][]XZ{}
-	return &World{Name: Name, ChunkMap: ChunkMap, RegionMap: RegionMap}
-}
-
 func MakeWorld(Name string) World {
 	if Debug {
 		log.Printf("MAKE WORLD: %s", Name)
@@ -203,7 +194,7 @@ func ReadWorld(dir string, name string) (*World, error) {
 	}
 
 	// make a new world
-	w := NewWorld(name)
+	w := MakeWorld(name)
 	w.SetRandomSeed(rSeed)
 	w.SetSpawn(spawn)
 
@@ -246,5 +237,5 @@ func ReadWorld(dir string, name string) (*World, error) {
 		}
 	}
 
-	return w, nil
+	return &w, nil
 }
