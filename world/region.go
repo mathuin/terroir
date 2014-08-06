@@ -11,7 +11,6 @@ import (
 	"io"
 	"io/ioutil"
 	"log"
-	"math"
 	"os"
 	"path"
 	"time"
@@ -137,8 +136,6 @@ func (w *World) WriteRegion(dir string, key XZ) error {
 	cb := new(bytes.Buffer)
 	locations := make([]int32, 1024)
 	timestamps := make([]int32, 1024)
-	zlibcomp := make([]byte, 1)
-	zlibcomp[0] = byte(2)
 	offset := int32(2)
 
 	numchunks := 0
@@ -147,89 +144,9 @@ func (w *World) WriteRegion(dir string, key XZ) error {
 			log.Printf("Writing %d, %d...", v.X, v.Z)
 		}
 		c := w.ChunkMap[v]
-		cx := c.xPos % 32
-		if cx < 0 {
-			cx = cx + 32
-		}
-		cz := c.zPos % 32
-		if cz < 0 {
-			cz = cz + 32
-		}
-		arroff := cz*32 + cx
-		if Debug {
-			log.Printf("arroff: (%d, %d) -> %d * 32 + %d = %d", c.xPos, c.zPos, cz, cx, arroff)
-		}
-
-		// write chunk to compressed buffer
-		var zb bytes.Buffer
-		zw := zlib.NewWriter(&zb)
-		ct := c.write()
-		if err := ct.Write(zw); err != nil {
-			return err
-		}
-		zw.Close()
-
-		// - calculate lengths
-		// (the extra byte is the compression byte)
-		ccl := int32(zb.Len() + 1)
-		count := int32(math.Ceil(float64(ccl) / 4096.0))
-		pad := int32(4096*count) - ccl - 4
-		whole := int(ccl + pad + 4)
-
-		if Debug {
-			log.Printf("Length of compressed chunk: %d", ccl)
-			log.Printf("Count of sectors: %d", count)
-			log.Printf("Padding: %d", pad)
-			log.Printf("Whole amount written: %d", whole)
-		}
-
-		if pad > 4096 {
-			return fmt.Errorf("pad %d > 4096", pad)
-		}
-
-		if (whole % 4096) != 0 {
-			return fmt.Errorf("%d not even multiple of 4096", whole)
-		}
-
-		posb := cb.Len()
-		if Debug {
-			log.Printf("Chunk %d seek position before %d", numchunks, posb)
-			log.Printf("(%d after two tables added)", 8192+posb)
-		}
-		posshould := (offset - 2) * 4096
-		if posb != int(posshould) {
-			return fmt.Errorf("posb for chunk %d is %d but should be %d!", numchunks, posb, posshould)
-		}
-
-		// - write chunk header and compressed chunk data to chunk writer
-		err := binary.Write(cb, binary.BigEndian, ccl)
+		arroff, count, arrout, err := c.WriteChunkToRegion()
 		if err != nil {
 			return err
-		}
-		_, err = cb.Write(zlibcomp)
-		if err != nil {
-			return err
-		}
-		_, err = zb.WriteTo(cb)
-		if err != nil {
-			return err
-		}
-
-		// - write necessary padding of zeroes to chunks writer
-		padb := make([]byte, pad)
-		_, err = cb.Write(padb)
-		if err != nil {
-			return err
-		}
-
-		posa := cb.Len()
-		if Debug {
-			log.Printf("Chunk %d seek position after %d", numchunks, posa)
-			log.Printf("(%d after two tables added)", 8192+posa)
-
-		}
-		if int32(posa-posb) != count*4096 {
-			return fmt.Errorf("posa for %d, %d is %d -- not even multiple of 4096!", cx, cz, posa)
 		}
 
 		// - write current time to timestamp array
@@ -243,6 +160,13 @@ func (w *World) WriteRegion(dir string, key XZ) error {
 		if Debug {
 			log.Printf("Locations are %d (%d * 256 + %d)", locations[arroff], offset, count)
 		}
+
+		// - write bytes to master chunk buffer
+		_, err = cb.Write(arrout)
+		if err != nil {
+			return err
+		}
+
 		offset = offset + count
 		numchunks = numchunks + 1
 	}

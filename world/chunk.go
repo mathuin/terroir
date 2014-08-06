@@ -1,8 +1,12 @@
 package world
 
 import (
+	"bytes"
+	"compress/zlib"
+	"encoding/binary"
 	"fmt"
 	"log"
+	"math"
 
 	"github.com/mathuin/terroir/nbt"
 )
@@ -202,4 +206,86 @@ func (c *Chunk) Read(t nbt.Tag) error {
 	}
 
 	return nil
+}
+
+func (c Chunk) WriteChunkToRegion() (arroff int32, count int32, arrout []byte, err error) {
+	cb := new(bytes.Buffer)
+	// JMT: not too hard to support gzip now...
+	comptype := byte(2)
+
+	cx := c.xPos % 32
+	if cx < 0 {
+		cx = cx + 32
+	}
+	cz := c.zPos % 32
+	if cz < 0 {
+		cz = cz + 32
+	}
+	arroff = cz*32 + cx
+	if Debug {
+		log.Printf("arroff: (%d, %d) -> %d * 32 + %d = %d", c.xPos, c.zPos, cz, cx, arroff)
+	}
+
+	// write chunk to compressed buffer
+	var zb bytes.Buffer
+	zw := zlib.NewWriter(&zb)
+	ct := c.write()
+	err = ct.Write(zw)
+	if err != nil {
+		return
+	}
+	zw.Close()
+
+	// - calculate lengths
+	// (the extra byte is the compression byte)
+	ccl := int32(zb.Len() + 1)
+	count = int32(math.Ceil(float64(ccl) / 4096.0))
+	pad := int32(4096*count) - ccl - 4
+	whole := int(ccl + pad + 4)
+
+	if Debug {
+		log.Printf("Length of compressed chunk: %d", ccl)
+		log.Printf("Count of sectors: %d", count)
+		log.Printf("Padding: %d", pad)
+		log.Printf("Whole amount written: %d", whole)
+	}
+
+	if pad > 4096 {
+		err = fmt.Errorf("pad %d > 4096", pad)
+		return
+	}
+
+	if (whole % 4096) != 0 {
+		err = fmt.Errorf("%d not even multiple of 4096", whole)
+		return
+	}
+
+	// - write chunk header and compressed chunk data to chunk writer
+	err = binary.Write(cb, binary.BigEndian, ccl)
+	if err != nil {
+		return
+	}
+	err = cb.WriteByte(comptype)
+	if err != nil {
+		return
+	}
+	_, err = zb.WriteTo(cb)
+	if err != nil {
+		return
+	}
+
+	// - write necessary padding of zeroes to chunks writer
+	padb := make([]byte, pad)
+	_, err = cb.Write(padb)
+	if err != nil {
+		return
+	}
+
+	if cb.Len() != whole {
+		err = fmt.Errorf("cb.Len() %d does not match whole %d", cb.Len(), whole)
+		return
+	}
+	arrout = cb.Bytes()
+
+	return
 }
