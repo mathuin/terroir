@@ -31,50 +31,6 @@ func (s Section) String() string {
 	return fmt.Sprintf("Section{}")
 }
 
-func (w *World) Block(pt Point) int {
-	s := w.Section(pt)
-	base := int(s.Blocks[pt.Index()])
-	add := int(Nibble(s.Add, pt.Index()))
-	return base + add*256
-}
-
-func (w *World) SetBlock(pt Point, b int) {
-	base := byte(b % 256)
-	add := byte(b / 256)
-	s := w.Section(pt)
-	i := pt.Index()
-	s.Blocks[i] = byte(base)
-	WriteNibble(s.Add, i, add)
-}
-
-func (w *World) Data(pt Point) byte {
-	return Nibble(w.Section(pt).Data, pt.Index())
-}
-
-func (w *World) SetData(pt Point, b byte) {
-	WriteNibble(w.Section(pt).Data, pt.Index(), b)
-}
-
-func (w *World) BlockLight(pt Point) byte {
-	return Nibble(w.Section(pt).BlockLight, pt.Index())
-}
-
-func (w *World) SetBlockLight(pt Point, b byte) {
-	WriteNibble(w.Section(pt).BlockLight, pt.Index(), b)
-}
-
-func (w *World) SkyLight(pt Point) byte {
-	return Nibble(w.Section(pt).SkyLight, pt.Index())
-}
-
-func (w *World) SetSkyLight(pt Point, b byte) {
-	WriteNibble(w.Section(pt).SkyLight, pt.Index(), b)
-}
-
-func (w World) Section(pt Point) Section {
-	return w.ChunkMap[pt.ChunkXZ()].Sections[int(floor(pt.Y, 16))]
-}
-
 func (s Section) write(y int) []nbt.Tag {
 	sElems := []nbt.CompoundElem{
 		{"Y", nbt.TAG_Byte, byte(y)},
@@ -90,7 +46,7 @@ func (s Section) write(y int) []nbt.Tag {
 	return sTagPayload
 }
 
-func ReadSection(tarr []nbt.Tag) Section {
+func ReadSection(tarr []nbt.Tag) (*Section, error) {
 	s := MakeSection()
 
 	for _, tval := range tarr {
@@ -108,9 +64,9 @@ func ReadSection(tarr []nbt.Tag) Section {
 		case "SkyLight":
 			s.SkyLight = tval.Payload.([]byte)
 		default:
-			log.Fatalf("tag name %s not required for section", tval.Name)
+			return nil, fmt.Errorf("tag name %s not required for section", tval.Name)
 		}
 	}
 
-	return s
+	return &s, nil
 }

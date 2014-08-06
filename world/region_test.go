@@ -1,5 +1,3 @@
-// Tests for Minecraft world package.
-
 package world
 
 import (
@@ -10,19 +8,13 @@ import (
 	"testing"
 )
 
-func Test_worldWriteRead(t *testing.T) {
+func Test_regionWriteRead(t *testing.T) {
 	saveDir := "."
 	worldName := "TerroirTest"
 	newWorldName := "TerroirTwo"
 	rx := 0
 	rz := 0
 	expected_count := 1024
-
-	td, nerr := ioutil.TempDir("", "")
-	if nerr != nil {
-		panic(nerr)
-	}
-	defer os.RemoveAll(td)
 
 	w := MakeWorld(worldName)
 
@@ -45,44 +37,7 @@ func Test_worldWriteRead(t *testing.T) {
 		t.Errorf("expected %d sectors, got %d", expected_count, n)
 	}
 
-	// write a new copy of the world
 	nw := MakeWorld(newWorldName)
-	nw.SetSpawn(w.Spawn)
-	nw.SetRandomSeed(w.RandomSeed)
-
-	for k, v := range w.ChunkMap {
-		nw.ChunkMap[k] = v
-	}
-
-	for k, v := range w.RegionMap {
-		nw.RegionMap[k] = v
-	}
-
-	nw.Write(td)
-
-	sw, swerr := ReadWorld(td, newWorldName)
-	if swerr != nil {
-		t.Fail()
-	}
-	_ = sw
-}
-
-func Test_FullReadWriteRead(t *testing.T) {
-	if testing.Short() {
-		t.Skip("skipping test in short mode")
-	}
-	saveDir := "."
-	worldName := "TerroirTest"
-	newWorldName := "TerroirTwo"
-
-	w, err := ReadWorld(saveDir, worldName)
-	if err != nil {
-		t.Fail()
-	}
-
-	nw := MakeWorld(newWorldName)
-
-	// copy all but the name
 	nw.SetSpawn(w.Spawn)
 	nw.SetRandomSeed(w.RandomSeed)
 
@@ -106,15 +61,46 @@ func Test_FullReadWriteRead(t *testing.T) {
 		panic(nerr)
 	}
 	defer os.RemoveAll(newSaveDir)
+	newWorldDir := path.Join(newSaveDir, w.Name)
+	if _, err := os.Stat(newWorldDir); err != nil {
+		if os.IsNotExist(err) {
+			os.Mkdir(newWorldDir, 0775)
+		} else {
+			t.Fail()
+		}
+	}
+	newRegionDir := path.Join(newWorldDir, "region")
+	if _, err := os.Stat(newRegionDir); err != nil {
+		if os.IsNotExist(err) {
+			os.Mkdir(newRegionDir, 0775)
+		} else {
+			t.Fail()
+		}
+	}
 
-	if err := nw.Write(newSaveDir); err != nil {
+	// writeregion here (actually write world!!)
+	nwXZ := XZ{X: int32(rx), Z: int32(rz)}
+	if err := nw.WriteRegion(newRegionDir, nwXZ); err != nil {
 		t.Fail()
 	}
 
 	// read it back
-	sw, serr := ReadWorld(newSaveDir, newWorldName)
-	if serr != nil {
-		t.Fail()
+	sw := MakeWorld(newWorldName)
+
+	// readregion here
+	swrname := path.Join(newRegionDir, fmt.Sprintf("r.%d.%d.mca", rx, rz))
+	swr, swrerr := os.Open(swrname)
+	if swrerr != nil {
+		panic(swrerr)
+	}
+	defer swr.Close()
+
+	swn, rerr := sw.ReadRegion(swr, int32(rx), int32(rz))
+	if rerr != nil {
+		panic(rerr)
+	}
+	if swn != expected_count {
+		t.Errorf("expected %d sectors, got %d", expected_count, swn)
 	}
 
 	// check value of some particular block

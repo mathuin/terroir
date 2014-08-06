@@ -1,13 +1,12 @@
 package world
 
 import (
-	"log"
 	"testing"
 
 	"github.com/mathuin/terroir/nbt"
 )
 
-func Test_chunkWrite(t *testing.T) {
+func Test_chunkWriteRead(t *testing.T) {
 	var cxPos, czPos int32
 	var cbiomes []byte
 	var cheightMap []int32
@@ -100,7 +99,16 @@ func Test_chunkWrite(t *testing.T) {
 				// sections are checked elsewhere
 			}
 		} else {
-			log.Fatalf("tag name %s not required for chunk", tag.Name)
+			t.Errorf("tag name %s not required for chunk", tag.Name)
 		}
 	}
+
+	// Now read it back!
+	newc := MakeChunk(cxPos, czPos)
+	if err := newc.Read(cTag); err != nil {
+		t.Fail()
+	}
+
+	// if this succeeds without throwing an error, it was able to read
+	// the level tags xPos and zPos, so that's good enough for me.
 }

@@ -2,7 +2,7 @@ package world
 
 import "testing"
 
-func Test_sectionWrite(t *testing.T) {
+func Test_sectionWriteRead(t *testing.T) {
 	s := MakeSection()
 
 	// populate it
@@ -65,5 +65,16 @@ func Test_sectionWrite(t *testing.T) {
 		if rtval == false {
 			t.Errorf("tag name %s required for section but not found", rtkey)
 		}
+	}
+
+	// Now read it back!
+	news, err := ReadSection(sTagPayload)
+	if err != nil {
+		t.Fail()
+	}
+
+	// Sanity check
+	if news.Blocks[0] != 0x31 {
+		t.Errorf("Blocks[0] is %#x, not %#x", news.Blocks[0], 0x31)
 	}
 }

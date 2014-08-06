@@ -90,7 +90,7 @@ func (c Chunk) write() nbt.Tag {
 	return topTag
 }
 
-func (c *Chunk) Read(t nbt.Tag) {
+func (c *Chunk) Read(t nbt.Tag) error {
 	requiredTags := map[string]bool{
 		"xPos":         false,
 		"zPos":         false,
@@ -102,21 +102,21 @@ func (c *Chunk) Read(t nbt.Tag) {
 	}
 
 	if t.Type != nbt.TAG_Compound {
-		log.Panic("top tag type not TAG_Compound!")
+		return fmt.Errorf("top tag type not TAG_Compound!")
 	}
 
 	if t.Name != "" {
-		log.Panic("top tag not unnamed")
+		return fmt.Errorf("top tag not unnamed")
 	}
 
 	levelTag := t.Payload.([]nbt.Tag)[0]
 
 	if levelTag.Type != nbt.TAG_Compound {
-		log.Panic("level tag type not TAG_Compound!")
+		return fmt.Errorf("level tag type not TAG_Compound!")
 	}
 
 	if levelTag.Name != "Level" {
-		log.Panic("level tag not named Level")
+		return fmt.Errorf("level tag not named Level")
 	}
 
 	for _, tval := range levelTag.Payload.([]nbt.Tag) {
@@ -132,12 +132,12 @@ func (c *Chunk) Read(t nbt.Tag) {
 			case "xPos":
 				xPos := tval.Payload.(int32)
 				if xPos != c.xPos {
-					log.Fatalf("xPos %d does not match c.xPos %d", xPos, c.xPos)
+					return fmt.Errorf("xPos %d does not match c.xPos %d", xPos, c.xPos)
 				}
 			case "zPos":
 				zPos := tval.Payload.(int32)
 				if zPos != c.zPos {
-					log.Fatalf("zPos %d does not match c.zPos %d", zPos, c.zPos)
+					return fmt.Errorf("zPos %d does not match c.zPos %d", zPos, c.zPos)
 				}
 			case "Biomes":
 				c.biomes = tval.Payload.([]byte)
@@ -154,12 +154,16 @@ func (c *Chunk) Read(t nbt.Tag) {
 						}
 					}
 					if !yValFound {
-						panic("no yVal found")
+						return fmt.Errorf("no yVal found")
 					}
 					if _, ok := c.Sections[yVal]; ok {
-						panic("yVal already found")
+						return fmt.Errorf("yVal already found")
 					}
-					c.Sections[yVal] = ReadSection(s)
+					news, err := ReadSection(s)
+					if err != nil {
+						return err
+					}
+					c.Sections[yVal] = *news
 				}
 			case "Entities":
 				if tval.Payload != nil {
@@ -193,8 +197,9 @@ func (c *Chunk) Read(t nbt.Tag) {
 
 	for rtkey, rtval := range requiredTags {
 		if rtval == false {
-			log.Fatalf("tag name %s required for chunk but not found", rtkey)
+			return fmt.Errorf("tag name %s required for chunk but not found", rtkey)
 		}
 	}
 
+	return nil
 }
