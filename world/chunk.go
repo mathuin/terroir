@@ -248,6 +248,7 @@ func WriteChunkToRegion(in chan Chunk, out chan CTROut, i int) {
 		}
 		if cout.err != nil {
 			out <- *cout
+			continue
 		}
 		zw.Close()
 
@@ -268,27 +269,32 @@ func WriteChunkToRegion(in chan Chunk, out chan CTROut, i int) {
 		if pad > 4096 {
 			cout.err = fmt.Errorf("pad %d > 4096", pad)
 			out <- *cout
+			continue
 		}
 
 		if (whole % 4096) != 0 {
 			cout.err = fmt.Errorf("%d not even multiple of 4096", whole)
 			out <- *cout
+			continue
 		}
 
 		// - write chunk header and compressed chunk data to chunk writer
 		cout.err = binary.Write(cb, binary.BigEndian, ccl)
 		if cout.err != nil {
 			out <- *cout
+			continue
 		}
 
 		cout.err = cb.WriteByte(comptype)
 		if cout.err != nil {
 			out <- *cout
+			continue
 		}
 
 		_, cout.err = zb.WriteTo(cb)
 		if cout.err != nil {
 			out <- *cout
+			continue
 		}
 
 		// - write necessary padding of zeroes to chunks writer
@@ -296,11 +302,13 @@ func WriteChunkToRegion(in chan Chunk, out chan CTROut, i int) {
 		_, cout.err = cb.Write(padb)
 		if cout.err != nil {
 			out <- *cout
+			continue
 		}
 
 		if cb.Len() != whole {
 			cout.err = fmt.Errorf("cb.Len() %d does not match whole %d", cb.Len(), whole)
 			out <- *cout
+			continue
 		}
 		cout.arrout = cb.Bytes()
 
