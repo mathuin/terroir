@@ -104,8 +104,14 @@ func Test_regionWriteRead(t *testing.T) {
 	}
 
 	// check value of some particular block
-	nbval := sw.Block(pt)
-	nb2val := sw.Block(pt2)
+	nbval, err := sw.Block(pt)
+	if err != nil {
+		t.Fail()
+	}
+	nb2val, err := sw.Block(pt2)
+	if err != nil {
+		t.Fail()
+	}
 
 	if nbval != obsidian {
 		t.Errorf("nbval %v is not equal to obsidian %v", nbval, obsidian)

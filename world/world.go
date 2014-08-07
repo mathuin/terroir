@@ -21,6 +21,10 @@ type XZ struct {
 	Z int32
 }
 
+func (xz XZ) String() string {
+	return fmt.Sprintf("(%d, %d)", xz.X, xz.Z)
+}
+
 type World struct {
 	Name       string
 	Spawn      Point
@@ -240,46 +244,90 @@ func ReadWorld(dir string, name string) (*World, error) {
 	return &w, nil
 }
 
-func (w *World) Block(pt Point) int {
-	s := w.Section(pt)
+func (w *World) Block(pt Point) (int, error) {
+	s, err := w.Section(pt)
+	if err != nil {
+		return 0, err
+	}
 	base := int(s.Blocks[pt.Index()])
 	add := int(Nibble(s.Add, pt.Index()))
-	return base + add*256
+	retval := base + add*256
+	return retval, nil
 }
 
-func (w *World) SetBlock(pt Point, b int) {
+func (w *World) SetBlock(pt Point, b int) error {
 	base := byte(b % 256)
 	add := byte(b / 256)
-	s := w.Section(pt)
+	s, err := w.Section(pt)
+	if err != nil {
+		return err
+	}
 	i := pt.Index()
 	s.Blocks[i] = byte(base)
 	WriteNibble(s.Add, i, add)
+	return nil
 }
 
-func (w *World) Data(pt Point) byte {
-	return Nibble(w.Section(pt).Data, pt.Index())
+// TODO: generalize this
+func (w *World) Data(pt Point) (byte, error) {
+	s, err := w.Section(pt)
+	if err != nil {
+		return 0, err
+	}
+	return Nibble(s.Data, pt.Index()), nil
 }
 
-func (w *World) SetData(pt Point, b byte) {
-	WriteNibble(w.Section(pt).Data, pt.Index(), b)
+func (w *World) SetData(pt Point, b byte) error {
+	s, err := w.Section(pt)
+	if err != nil {
+		return err
+	}
+	WriteNibble(s.Data, pt.Index(), b)
+	return nil
 }
 
-func (w *World) BlockLight(pt Point) byte {
-	return Nibble(w.Section(pt).BlockLight, pt.Index())
+func (w *World) BlockLight(pt Point) (byte, error) {
+	s, err := w.Section(pt)
+	if err != nil {
+		return 0, err
+	}
+	return Nibble(s.BlockLight, pt.Index()), nil
 }
 
-func (w *World) SetBlockLight(pt Point, b byte) {
-	WriteNibble(w.Section(pt).BlockLight, pt.Index(), b)
+func (w *World) SetBlockLight(pt Point, b byte) error {
+	s, err := w.Section(pt)
+	if err != nil {
+		return err
+	}
+	WriteNibble(s.BlockLight, pt.Index(), b)
+	return nil
 }
 
-func (w *World) SkyLight(pt Point) byte {
-	return Nibble(w.Section(pt).SkyLight, pt.Index())
+func (w *World) SkyLight(pt Point) (byte, error) {
+	s, err := w.Section(pt)
+	if err != nil {
+		return 0, err
+	}
+	return Nibble(s.SkyLight, pt.Index()), nil
 }
 
-func (w *World) SetSkyLight(pt Point, b byte) {
-	WriteNibble(w.Section(pt).SkyLight, pt.Index(), b)
+func (w *World) SetSkyLight(pt Point, b byte) error {
+	s, err := w.Section(pt)
+	if err != nil {
+		return err
+	}
+	WriteNibble(s.SkyLight, pt.Index(), b)
+	return nil
 }
 
-func (w World) Section(pt Point) Section {
-	return w.ChunkMap[pt.ChunkXZ()].Sections[int(floor(pt.Y, 16))]
+func (w World) Section(pt Point) (*Section, error) {
+	cXZ := pt.ChunkXZ()
+	yf := int(floor(pt.Y, 16))
+	if c, ok := w.ChunkMap[cXZ]; ok {
+		if s, ok := c.Sections[yf]; ok {
+			return &s, nil
+		}
+		return nil, fmt.Errorf("section %d of chunk %v not present", yf, cXZ)
+	}
+	return nil, fmt.Errorf("chunk %v not present", cXZ)
 }
