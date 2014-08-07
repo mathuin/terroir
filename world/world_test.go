@@ -59,7 +59,8 @@ func Test_worldWriteRead(t *testing.T) {
 		nw.RegionMap[k] = v
 	}
 
-	nw.Write(td)
+	nw.SetSaveDir(td)
+	nw.Write()
 
 	sw, swerr := ReadWorld(td, newWorldName)
 	if swerr != nil {
@@ -108,7 +109,8 @@ func Test_FullReadWriteRead(t *testing.T) {
 	}
 	defer os.RemoveAll(newSaveDir)
 
-	if err := nw.Write(newSaveDir); err != nil {
+	nw.SetSaveDir(newSaveDir)
+	if err := nw.Write(); err != nil {
 		t.Fail()
 	}
 

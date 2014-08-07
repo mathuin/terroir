@@ -3,6 +3,7 @@
 package world
 
 import (
+	"encoding/binary"
 	"fmt"
 	"io/ioutil"
 	"log"
@@ -26,6 +27,7 @@ func (xz XZ) String() string {
 }
 
 type World struct {
+	SaveDir    string
 	Name       string
 	Spawn      Point
 	spawnSet   bool
@@ -47,6 +49,18 @@ func (w World) String() string {
 	return fmt.Sprintf("World{Name: %s, Spawn: %v, RandomSeed: %d}", w.Name, w.Spawn, w.RandomSeed)
 }
 
+func (w *World) SetSaveDir(dir string) error {
+	if Debug {
+		log.Printf("SET SAVE DIR: %s: %s", w.Name, dir)
+	}
+
+	if err := os.MkdirAll(dir, 0775); err != nil {
+		return err
+	}
+	w.SaveDir = dir
+	return nil
+}
+
 func (w *World) SetRandomSeed(seed int64) {
 	if Debug {
 		log.Printf("SET SEED: %s: %d", w.Name, seed)
@@ -66,43 +80,24 @@ func (w *World) SetSpawn(p Point) {
 	w.spawnSet = true
 }
 
-func (w World) Write(dir string) error {
-	// make sure the directory exists and is writeable
-	if _, err := os.Stat(dir); err != nil {
-		if os.IsNotExist(err) {
-			os.Mkdir(dir, 0775)
-		} else {
-			return err
-		}
+func (w World) Write() error {
+	if Debug {
+		log.Printf("WRITE WORLD: %s", w.Name)
 	}
-	worldDir := path.Join(dir, w.Name)
-	if _, err := os.Stat(worldDir); err != nil {
-		if os.IsNotExist(err) {
-			os.Mkdir(worldDir, 0775)
-		} else {
-			return err
-		}
-	}
-	regionDir := path.Join(worldDir, "region")
-	if _, err := os.Stat(regionDir); err != nil {
-		if os.IsNotExist(err) {
-			os.Mkdir(regionDir, 0775)
-		} else {
-			return err
-		}
+
+	if w.SaveDir == "" {
+		return fmt.Errorf("world savedir not set")
 	}
 
 	// write level
-	if err := w.writelevel(worldDir); err != nil {
+	if err := w.writeLevel(); err != nil {
 		return err
 	}
 
-	for key := range w.RegionMap {
-		if err := w.WriteRegion(regionDir, key); err != nil {
-			return err
-		}
+	// write regions
+	if err := w.writeRegions(); err != nil {
+		return err
 	}
-
 	return nil
 }
 
@@ -111,33 +106,8 @@ func ReadWorld(dir string, name string) (*World, error) {
 	var spawn Point
 	var rSeed int64
 
-	// does dir exist?
-	if _, err := os.Stat(dir); err != nil {
-		if os.IsNotExist(err) {
-			return nil, fmt.Errorf("save dir does not exist")
-		} else {
-			return nil, err
-		}
-	}
-	// does dir+name exist?
-	worldDir := path.Join(dir, name)
-	if _, err := os.Stat(worldDir); err != nil {
-		if os.IsNotExist(err) {
-			return nil, fmt.Errorf("world dir does not exist")
-		} else {
-			return nil, err
-		}
-	}
-	// does dir+name+region exist?
-	regionDir := path.Join(worldDir, "region")
-	if _, err := os.Stat(regionDir); err != nil {
-		if os.IsNotExist(err) {
-			return nil, fmt.Errorf("region dir does not exist")
-		} else {
-			return nil, err
-		}
-	}
 	// read level file
+	worldDir := path.Join(dir, name)
 	levelFile := path.Join(worldDir, "level.dat")
 	if Debug {
 		log.Printf("Reading level file %s", levelFile)
@@ -199,11 +169,13 @@ func ReadWorld(dir string, name string) (*World, error) {
 
 	// make a new world
 	w := MakeWorld(name)
+	w.SetSaveDir(dir)
 	w.SetRandomSeed(rSeed)
 	w.SetSpawn(spawn)
 
 	// for file in region dir
 	regionRE, err := regexp.Compile("r\\.(-?\\d*)\\.(-?\\d*)\\.mca")
+	regionDir := path.Join(worldDir, "region")
 	rd, err := ioutil.ReadDir(regionDir)
 	if err != nil {
 		return nil, err
@@ -214,7 +186,7 @@ func ReadWorld(dir string, name string) (*World, error) {
 			continue
 		}
 		match := matches[0]
-		mfn := match[0]
+		// mfn := match[0]
 		outx, xerr := strconv.ParseInt(match[1], 10, 32)
 		if xerr != nil {
 			panic(xerr)
@@ -223,22 +195,24 @@ func ReadWorld(dir string, name string) (*World, error) {
 		if zerr != nil {
 			panic(zerr)
 		}
-		rname := path.Join(regionDir, mfn)
-		if Debug {
-			log.Printf("Reading region file %s", rname)
-		}
-		r, rerr := os.Open(rname)
+		// rname := path.Join(regionDir, mfn)
+		// if Debug {
+		// 	log.Printf("Reading region file %s", rname)
+		// }
+		// r, rerr := os.Open(rname)
+		// if rerr != nil {
+		// 	panic(rerr)
+		// }
+		// defer r.Close()
+		// n, rerr := w.ReadRegion(r, int32(outx), int32(outz))
+		rXZ := XZ{X: int32(outx), Z: int32(outz)}
+		_, rerr := w.loadAllChunksFromRegion(rXZ)
 		if rerr != nil {
 			panic(rerr)
 		}
-		defer r.Close()
-		n, rerr := w.ReadRegion(r, int32(outx), int32(outz))
-		if rerr != nil {
-			panic(rerr)
-		}
-		if Debug {
-			log.Printf("... read %d chunks", n)
-		}
+		// if Debug {
+		// 	log.Printf("... read %d chunks", n)
+		// }
 	}
 
 	return &w, nil
@@ -323,11 +297,88 @@ func (w *World) SetSkyLight(pt Point, b byte) error {
 func (w World) Section(pt Point) (*Section, error) {
 	cXZ := pt.ChunkXZ()
 	yf := int(floor(pt.Y, 16))
-	if c, ok := w.ChunkMap[cXZ]; ok {
-		if s, ok := c.Sections[yf]; ok {
-			return &s, nil
+	c, ok := w.ChunkMap[cXZ]
+	if !ok {
+		cp, lerr := w.loadChunk(cXZ)
+		if lerr != nil {
+			var emptytag nbt.Tag
+			mcp, merr := w.MakeChunk(cXZ, emptytag)
+			if merr != nil {
+				return nil, merr
+			}
+			cp = mcp
 		}
-		return nil, fmt.Errorf("section %d of chunk %v not present", yf, cXZ)
+		c = *cp
+
 	}
-	return nil, fmt.Errorf("chunk %v not present", cXZ)
+	s, ok := c.Sections[yf]
+	if !ok {
+		c.Sections[yf] = MakeSection()
+		s = c.Sections[yf]
+	}
+	return &s, nil
+}
+
+// arguments are in chunk coordinates
+func (w *World) loadChunk(cXZ XZ) (*Chunk, error) {
+	if Debug {
+		log.Printf("LOAD CHUNK: %s: %v", w.Name, cXZ)
+	}
+	rXZ := XZ{X: floor(cXZ.X, 32), Z: floor(cXZ.Z, 32)}
+	rname := w.regionFilename(rXZ)
+	r, err := os.Open(rname)
+	if err != nil {
+		return nil, err
+	}
+	defer r.Close()
+	cindex := (cXZ.Z%32)*32 + (cXZ.X % 32)
+
+	_, lerr := r.Seek(int64(cindex*4), os.SEEK_SET)
+	if lerr != nil {
+		panic(lerr)
+	}
+
+	var location int32
+
+	err = binary.Read(r, binary.BigEndian, &location)
+	if err != nil {
+		panic(err)
+	}
+
+	if location == 0 {
+		return nil, fmt.Errorf("location is zero: chunk not in region file")
+	}
+
+	return w.loadChunkFromRegion(r, location, cXZ)
+}
+
+func (w *World) MakeChunk(xz XZ, tag nbt.Tag) (*Chunk, error) {
+	c := MakeChunk(xz.X, xz.Z)
+	var emptytag nbt.Tag
+	if tag != emptytag {
+		c.Read(tag)
+		if c.xPos != xz.X || c.zPos != xz.Z {
+			return nil, fmt.Errorf("tag position (%d, %d) did not match XZ %v", c.xPos, c.zPos, xz)
+		}
+	}
+	if err := w.addChunkToMaps(c); err != nil {
+		return nil, err
+	}
+	return &c, nil
+}
+
+func (w *World) addChunkToMaps(c Chunk) error {
+	cXZ := XZ{X: c.xPos, Z: c.zPos}
+	if _, ok := w.ChunkMap[cXZ]; ok {
+		return fmt.Errorf("chunk %v already exists", cXZ)
+	}
+	w.ChunkMap[cXZ] = c
+	rXZ := XZ{X: floor(cXZ.X, 32), Z: floor(cXZ.Z, 32)}
+	for _, cptr := range w.RegionMap[rXZ] {
+		if cptr == cXZ {
+			return fmt.Errorf("chunk %v already in region map", cXZ)
+		}
+	}
+	w.RegionMap[rXZ] = append(w.RegionMap[rXZ], cXZ)
+	return nil
 }

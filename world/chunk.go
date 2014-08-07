@@ -2,11 +2,15 @@ package world
 
 import (
 	"bytes"
+	"compress/gzip"
 	"compress/zlib"
 	"encoding/binary"
 	"fmt"
+	"io"
+	"io/ioutil"
 	"log"
 	"math"
+	"os"
 	"time"
 
 	"github.com/mathuin/terroir/nbt"
@@ -314,4 +318,128 @@ func WriteChunkToRegion(in chan Chunk, out chan CTROut, i int) {
 
 		out <- *cout
 	}
+}
+
+func (w *World) loadChunkFromRegion(r io.ReadSeeker, location int32, cXZ XZ) (*Chunk, error) {
+	offset := location / 256
+	count := location % 256
+
+	if Debug {
+		log.Printf("%v: ", cXZ)
+		log.Printf("  offset %d sectors (%d bytes)", offset, offset*4096)
+		log.Printf("  count %d sectors (%d bytes)", count, count*4096)
+	}
+
+	_, perr := r.Seek(int64(offset*4096), os.SEEK_SET)
+	if perr != nil {
+		panic(perr)
+	}
+
+	var chunklen int32
+	err := binary.Read(r, binary.BigEndian, &chunklen)
+	if err != nil {
+		return nil, err
+	}
+
+	if Debug {
+		log.Printf("Actual read: %d bytes (%d bytes padding)", chunklen, (int32(count*4096) - chunklen))
+	}
+
+	flag := make([]uint8, 1)
+	_, err = io.ReadFull(r, flag)
+	if err != nil {
+		return nil, err
+	}
+	zchr := make([]byte, chunklen)
+	var zr, unzr io.Reader
+	zr = bytes.NewBuffer(zchr)
+	ret, err := io.ReadFull(r, zchr)
+	if err != nil {
+		return nil, err
+	}
+	if Debug {
+		log.Printf("%d compressed bytes read", ret)
+	}
+	if Debug {
+		log.Printf("Compression:")
+	}
+	switch flag[0] {
+	case 0:
+		if Debug {
+			log.Printf("  none?")
+		}
+		unzr = zr
+	case 1:
+		if Debug {
+			log.Printf("  gzip")
+		}
+		unzr, err = gzip.NewReader(zr)
+		if err != nil {
+			return nil, err
+		}
+	case 2:
+		if Debug {
+			log.Printf("  zlib")
+		}
+		unzr, err = zlib.NewReader(zr)
+		if err != nil {
+			return nil, err
+		}
+	}
+	zstr, err := ioutil.ReadAll(unzr)
+	if err != nil {
+		return nil, err
+	}
+	if Debug {
+		log.Printf("uncompressed len %d", len(zstr))
+	}
+	var tag nbt.Tag
+	zb := bytes.NewBuffer(zstr)
+	tag, err = nbt.ReadTag(zb)
+	if err != nil {
+		return nil, err
+	}
+	var c *Chunk
+	c, err = w.MakeChunk(cXZ, tag)
+	if err != nil {
+		return nil, err
+	}
+	return c, nil
+}
+
+func (w *World) loadAllChunksFromRegion(rXZ XZ) (int, error) {
+	if Debug {
+		log.Printf("LOAD ALL CHUNKS: %s: %v", w.Name, rXZ)
+	}
+	rname := w.regionFilename(rXZ)
+	if Debug {
+		log.Printf("Reading region file %s", rname)
+	}
+	r, err := os.Open(rname)
+	if err != nil {
+		return 0, err
+	}
+	defer r.Close()
+
+	locations := make([]int32, 1024)
+
+	err = binary.Read(r, binary.BigEndian, &locations)
+
+	numchunks := 0
+	for i, location := range locations {
+		// eventually parallelize this
+		// mutexes around chunkmap and regionmap of course
+		if location != 0 {
+			cXZ := XZ{X: rXZ.X*32 + int32(i%32), Z: rXZ.Z*32 + int32(i/32)}
+			_, err := w.loadChunkFromRegion(r, location, cXZ)
+			if err != nil {
+				return 0, err
+			}
+			numchunks = numchunks + 1
+		}
+	}
+	if Debug {
+		log.Printf("... read %d chunks", numchunks)
+	}
+	return numchunks, nil
 }

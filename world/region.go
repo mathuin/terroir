@@ -117,17 +117,13 @@ func (w *World) ReadRegion(r io.ReadSeeker, xCoord int32, zCoord int32) (int, er
 				log.Printf("uncompressed len %d", len(zstr))
 			}
 			var tag nbt.Tag
-			tmpchunk := MakeChunk(int32(x), int32(z))
 			zb := bytes.NewBuffer(zstr)
 			tag, err = nbt.ReadTag(zb)
 			if err != nil {
 				return numchunks, err
 			}
-			tmpchunk.Read(tag)
-			cXZ := XZ{X: tmpchunk.xPos, Z: tmpchunk.zPos}
-			w.ChunkMap[cXZ] = tmpchunk
-			rXZ := XZ{X: floor(cXZ.X, 32), Z: floor(cXZ.Z, 32)}
-			w.RegionMap[rXZ] = append(w.RegionMap[rXZ], cXZ)
+			cXZ := XZ{X: int32(x), Z: int32(z)}
+			w.MakeChunk(cXZ, tag)
 			numchunks = numchunks + 1
 		}
 	}
@@ -141,7 +137,7 @@ func (w World) genChunks(key XZ, in chan Chunk) {
 	close(in)
 }
 
-func (w *World) WriteRegion(dir string, key XZ) error {
+func (w *World) writeRegion(dir string, key XZ) error {
 	chunks := 1024
 	cb := new(bytes.Buffer)
 	locations := make([]int32, chunks)
@@ -223,4 +219,22 @@ func (w *World) WriteRegion(dir string, key XZ) error {
 		log.Printf("... wrote %d chunks", numchunks)
 	}
 	return nil
+}
+
+func (w *World) writeRegions() error {
+	regionDir := path.Join(w.SaveDir, w.Name, "region")
+	if err := os.MkdirAll(regionDir, 0775); err != nil {
+		return err
+	}
+
+	for key := range w.RegionMap {
+		if err := w.writeRegion(regionDir, key); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func (w World) regionFilename(rXZ XZ) string {
+	return path.Join(w.SaveDir, w.Name, "region", fmt.Sprintf("r.%d.%d.mca", rXZ.Z, rXZ.Z))
 }

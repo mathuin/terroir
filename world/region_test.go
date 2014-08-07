@@ -80,7 +80,7 @@ func Test_regionWriteRead(t *testing.T) {
 
 	// writeregion here (actually write world!!)
 	nwXZ := XZ{X: int32(rx), Z: int32(rz)}
-	if err := nw.WriteRegion(newRegionDir, nwXZ); err != nil {
+	if err := nw.writeRegion(newRegionDir, nwXZ); err != nil {
 		t.Fail()
 	}
 

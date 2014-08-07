@@ -5,6 +5,7 @@ package world
 import (
 	"fmt"
 	"log"
+	"os"
 	"path"
 
 	"github.com/mathuin/terroir/nbt"
@@ -60,15 +61,16 @@ func (w World) level() (t nbt.Tag, err error) {
 	return
 }
 
-func (w World) writelevel(dir string) error {
-	if path.Base(dir) != w.Name {
-		return fmt.Errorf("directory does not contain world name")
+func (w World) writeLevel() error {
+	worldDir := path.Join(w.SaveDir, w.Name)
+	if err := os.MkdirAll(worldDir, 0775); err != nil {
+		return err
 	}
 	levelTag, err := w.level()
 	if err != nil {
 		return err
 	}
-	levelFile := path.Join(dir, "level.dat")
+	levelFile := path.Join(worldDir, "level.dat")
 	if Debug {
 		log.Printf("Writing level file %s", levelFile)
 	}
