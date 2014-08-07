@@ -13,6 +13,8 @@ import (
 	"log"
 	"os"
 	"path"
+	"runtime"
+	"sync"
 	"time"
 
 	"github.com/mathuin/terroir/nbt"
@@ -132,42 +134,60 @@ func (w *World) ReadRegion(r io.ReadSeeker, xCoord int32, zCoord int32) (int, er
 	return numchunks, nil
 }
 
-func (w *World) WriteRegion(dir string, key XZ) error {
-	cb := new(bytes.Buffer)
-	locations := make([]int32, 1024)
-	timestamps := make([]int32, 1024)
-	offset := int32(2)
-
-	numchunks := 0
+func (w World) genChunks(key XZ, in chan Chunk) {
 	for _, v := range w.RegionMap[key] {
-		if Debug {
-			log.Printf("Writing %d, %d...", v.X, v.Z)
-		}
-		c := w.ChunkMap[v]
-		arroff, count, arrout, err := c.WriteChunkToRegion()
-		if err != nil {
-			return err
+		in <- w.ChunkMap[v]
+	}
+	close(in)
+}
+
+func (w *World) WriteRegion(dir string, key XZ) error {
+	chunks := 1024
+	cb := new(bytes.Buffer)
+	locations := make([]int32, chunks)
+	timestamps := make([]int32, chunks)
+	offset := int32(2)
+	numchunks := 0
+
+	in := make(chan Chunk)
+	out := make(chan CTROut)
+
+	var wg sync.WaitGroup
+
+	for i := 0; i < runtime.NumCPU(); i++ {
+		go func(i int) {
+			wg.Add(1)
+			WriteChunkToRegion(in, out, i)
+			wg.Done()
+		}(i)
+	}
+	go func() { wg.Wait(); close(out) }()
+	go w.genChunks(key, in)
+
+	for cout := range out {
+		if cout.err != nil {
+			return cout.err
 		}
 
 		// - write current time to timestamp array
-		timestamps[arroff] = int32(time.Now().Unix())
+		timestamps[cout.arroff] = int32(time.Now().Unix())
 		if Debug {
-			log.Printf("Timestamps are %d", timestamps[arroff])
+			log.Printf("Timestamps are %d", timestamps[cout.arroff])
 		}
 
 		// - write offset and count to locations array
-		locations[arroff] = offset*256 + int32(count)
+		locations[cout.arroff] = offset*256 + int32(cout.count)
 		if Debug {
-			log.Printf("Locations are %d (%d * 256 + %d)", locations[arroff], offset, count)
+			log.Printf("Locations are %d (%d * 256 + %d)", locations[cout.arroff], offset, cout.count)
 		}
 
 		// - write bytes to master chunk buffer
-		_, err = cb.Write(arrout)
+		_, err := cb.Write(cout.arrout)
 		if err != nil {
 			return err
 		}
 
-		offset = offset + count
+		offset = offset + cout.count
 		numchunks = numchunks + 1
 	}
 

@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"log"
 	"math"
+	"time"
 
 	"github.com/mathuin/terroir/nbt"
 )
@@ -208,84 +209,101 @@ func (c *Chunk) Read(t nbt.Tag) error {
 	return nil
 }
 
-func (c Chunk) WriteChunkToRegion() (arroff int32, count int32, arrout []byte, err error) {
-	cb := new(bytes.Buffer)
-	// JMT: not too hard to support gzip now...
-	comptype := byte(2)
+type CTROut struct {
+	arroff int32
+	count  int32
+	arrout []byte
+	err    error
+}
 
-	cx := c.xPos % 32
-	if cx < 0 {
-		cx = cx + 32
-	}
-	cz := c.zPos % 32
-	if cz < 0 {
-		cz = cz + 32
-	}
-	arroff = cz*32 + cx
-	if Debug {
-		log.Printf("arroff: (%d, %d) -> %d * 32 + %d = %d", c.xPos, c.zPos, cz, cx, arroff)
-	}
+func WriteChunkToRegion(in chan Chunk, out chan CTROut, i int) {
+	for c := range in {
+		cout := new(CTROut)
+		cb := new(bytes.Buffer)
+		// JMT: not too hard to support gzip now...
+		comptype := byte(2)
 
-	// write chunk to compressed buffer
-	var zb bytes.Buffer
-	zw := zlib.NewWriter(&zb)
-	ct := c.write()
-	err = ct.Write(zw)
-	if err != nil {
-		return
-	}
-	zw.Close()
+		cx := c.xPos % 32
+		if cx < 0 {
+			cx = cx + 32
+		}
+		cz := c.zPos % 32
+		if cz < 0 {
+			cz = cz + 32
+		}
+		cout.arroff = cz*32 + cx
+		if Debug {
+			log.Printf("arroff: (%d, %d) -> %d * 32 + %d = %d", i, c.xPos, c.zPos, cz, cx, cout.arroff)
+		}
 
-	// - calculate lengths
-	// (the extra byte is the compression byte)
-	ccl := int32(zb.Len() + 1)
-	count = int32(math.Ceil(float64(ccl) / 4096.0))
-	pad := int32(4096*count) - ccl - 4
-	whole := int(ccl + pad + 4)
+		// write chunk to compressed buffer
+		ct := c.write()
+		var zb bytes.Buffer
+		zw := zlib.NewWriter(&zb)
+		start := time.Now().UnixNano()
+		cout.err = ct.Write(zw)
+		end := time.Now().UnixNano()
+		if Debug {
+			log.Printf("ct.Write(zw) took %d nanoseconds", end-start)
+		}
+		if cout.err != nil {
+			out <- *cout
+		}
+		zw.Close()
 
-	if Debug {
-		log.Printf("Length of compressed chunk: %d", ccl)
-		log.Printf("Count of sectors: %d", count)
-		log.Printf("Padding: %d", pad)
-		log.Printf("Whole amount written: %d", whole)
-	}
+		// - calculate lengths
+		// (the extra byte is the compression byte)
+		ccl := int32(zb.Len() + 1)
+		cout.count = int32(math.Ceil(float64(ccl) / 4096.0))
+		pad := int32(4096*cout.count) - ccl - 4
+		whole := int(ccl + pad + 4)
 
-	if pad > 4096 {
-		err = fmt.Errorf("pad %d > 4096", pad)
-		return
-	}
+		if Debug {
+			log.Printf("Length of compressed chunk: %d", ccl)
+			log.Printf("Count of sectors: %d", cout.count)
+			log.Printf("Padding: %d", pad)
+			log.Printf("Whole amount written: %d", whole)
+		}
 
-	if (whole % 4096) != 0 {
-		err = fmt.Errorf("%d not even multiple of 4096", whole)
-		return
-	}
+		if pad > 4096 {
+			cout.err = fmt.Errorf("pad %d > 4096", pad)
+			out <- *cout
+		}
 
-	// - write chunk header and compressed chunk data to chunk writer
-	err = binary.Write(cb, binary.BigEndian, ccl)
-	if err != nil {
-		return
-	}
-	err = cb.WriteByte(comptype)
-	if err != nil {
-		return
-	}
-	_, err = zb.WriteTo(cb)
-	if err != nil {
-		return
-	}
+		if (whole % 4096) != 0 {
+			cout.err = fmt.Errorf("%d not even multiple of 4096", whole)
+			out <- *cout
+		}
 
-	// - write necessary padding of zeroes to chunks writer
-	padb := make([]byte, pad)
-	_, err = cb.Write(padb)
-	if err != nil {
-		return
-	}
+		// - write chunk header and compressed chunk data to chunk writer
+		cout.err = binary.Write(cb, binary.BigEndian, ccl)
+		if cout.err != nil {
+			out <- *cout
+		}
 
-	if cb.Len() != whole {
-		err = fmt.Errorf("cb.Len() %d does not match whole %d", cb.Len(), whole)
-		return
-	}
-	arrout = cb.Bytes()
+		cout.err = cb.WriteByte(comptype)
+		if cout.err != nil {
+			out <- *cout
+		}
 
-	return
+		_, cout.err = zb.WriteTo(cb)
+		if cout.err != nil {
+			out <- *cout
+		}
+
+		// - write necessary padding of zeroes to chunks writer
+		padb := make([]byte, pad)
+		_, cout.err = cb.Write(padb)
+		if cout.err != nil {
+			out <- *cout
+		}
+
+		if cb.Len() != whole {
+			cout.err = fmt.Errorf("cb.Len() %d does not match whole %d", cb.Len(), whole)
+			out <- *cout
+		}
+		cout.arrout = cb.Bytes()
+
+		out <- *cout
+	}
 }
