@@ -135,10 +135,10 @@ func Test_FullReadWriteRead(t *testing.T) {
 		t.Fail()
 	}
 
-	if nbval != obsidian {
+	if *nbval != *obsidian {
 		t.Errorf("nbval %v is not equal to obsidian %v", nbval, obsidian)
 	}
-	if nb2val != obsidian {
+	if *nb2val != *obsidian {
 		t.Errorf("nb2val %v is not equal to obsidian %v", nb2val, obsidian)
 	}
 }
