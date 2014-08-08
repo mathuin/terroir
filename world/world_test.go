@@ -98,7 +98,7 @@ func Test_FullReadWriteRead(t *testing.T) {
 	}
 
 	// set two points to obsidian
-	obsidian := 49
+	obsidian := MakeBlock(49, 0)
 	pt := MakePoint(0, 60, 0)
 	pt2 := MakePoint(1, 60, 0)
 	nw.SetBlock(pt, obsidian)
@@ -132,10 +132,10 @@ func Test_FullReadWriteRead(t *testing.T) {
 		t.Fail()
 	}
 
-	if nbval != obsidian {
+	if *nbval != obsidian {
 		t.Errorf("nbval %v is not equal to obsidian %v", nbval, obsidian)
 	}
-	if nb2val != obsidian {
+	if *nb2val != obsidian {
 		t.Errorf("nb2val %v is not equal to obsidian %v", nb2val, obsidian)
 	}
 }
@@ -151,14 +151,14 @@ func Test_tinyWorld(t *testing.T) {
 	// points and values for the world
 	var points = []struct {
 		p Point
-		v int
+		b Block
 	}{
-		{Point{X: 7, Y: 85, Z: 7}, 49},
-		{Point{X: 8, Y: 85, Z: 7}, 49},
-		{Point{X: 7, Y: 86, Z: 7}, 0},
-		{Point{X: 8, Y: 86, Z: 7}, 0},
-		{Point{X: 7, Y: 87, Z: 7}, 0},
-		{Point{X: 8, Y: 87, Z: 7}, 0},
+		{Point{X: 7, Y: 85, Z: 7}, Block{49, 0}},
+		{Point{X: 8, Y: 85, Z: 7}, Block{49, 0}},
+		{Point{X: 7, Y: 86, Z: 7}, Block{0, 0}},
+		{Point{X: 8, Y: 86, Z: 7}, Block{0, 0}},
+		{Point{X: 7, Y: 87, Z: 7}, Block{0, 0}},
+		{Point{X: 8, Y: 87, Z: 7}, Block{0, 0}},
 	}
 
 	w := MakeWorld(worldName)
@@ -169,7 +169,7 @@ func Test_tinyWorld(t *testing.T) {
 
 	// set the points
 	for _, pv := range points {
-		w.SetBlock(pv.p, pv.v)
+		w.SetBlock(pv.p, pv.b)
 	}
 
 	// now write the level
@@ -186,12 +186,12 @@ func Test_tinyWorld(t *testing.T) {
 
 	// are those blocks still set?
 	for i, pv := range points {
-		v, err := nw.Block(pv.p)
+		b, err := nw.Block(pv.p)
 		if err != nil {
 			t.Fail()
 		}
-		if v != pv.v {
-			t.Errorf("Point #%d: (%v) expected %d, got %d", i, pv.p, pv.v, v)
+		if *b != pv.b {
+			t.Errorf("Point #%d: (%v) expected %v, got %v", i, pv.p, pv.b, *b)
 		}
 	}
 }

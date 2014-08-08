@@ -182,48 +182,7 @@ func ReadWorld(dir string, name string, loadAllChunks bool) (*World, error) {
 	return &w, nil
 }
 
-func (w *World) Block(pt Point) (int, error) {
-	s, err := w.Section(pt)
-	if err != nil {
-		return 0, err
-	}
-	base := int(s.Blocks[pt.Index()])
-	add := int(Nibble(s.Add, pt.Index()))
-	retval := base + add*256
-	return retval, nil
-}
-
-func (w *World) SetBlock(pt Point, b int) error {
-	base := byte(b % 256)
-	add := byte(b / 256)
-	s, err := w.Section(pt)
-	if err != nil {
-		return err
-	}
-	i := pt.Index()
-	s.Blocks[i] = byte(base)
-	WriteNibble(s.Add, i, add)
-	return nil
-}
-
-// TODO: generalize this
-func (w *World) Data(pt Point) (byte, error) {
-	s, err := w.Section(pt)
-	if err != nil {
-		return 0, err
-	}
-	return Nibble(s.Data, pt.Index()), nil
-}
-
-func (w *World) SetData(pt Point, b byte) error {
-	s, err := w.Section(pt)
-	if err != nil {
-		return err
-	}
-	WriteNibble(s.Data, pt.Index(), b)
-	return nil
-}
-
+// JMT: currently unused
 func (w *World) BlockLight(pt Point) (byte, error) {
 	s, err := w.Section(pt)
 	if err != nil {
