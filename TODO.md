@@ -1,15 +1,15 @@
 Development task list
 ---------------------
 
-- [ ] Write NBT package
-  - [ ] Implement whole spec now rather than wait
-  - [ ] Use level.dat for test when possible
-  - [ ] Double-check test coverage!
-- [ ] Configure CI through drone.io
-- [ ] Write world package
-  - [ ] Write level.dat and test
-  - [ ] Random access to blocks and data in world
-  - [ ] Double-check test coverage!
+- [x] Write NBT package
+  - [x] Implement whole spec now rather than wait
+  - [x] Use level.dat for test when possible
+  - [x] Double-check test coverage!
+- [x] Configure CI through drone.io
+- [x] Write world package
+  - [x] Write level.dat and test
+  - [x] Random access to blocks and data in world
+  - [x] Double-check test coverage!
 - [ ] Write map generation package including biome map
   - [ ] Import landcover data into map
   - [ ] Generate crust array
