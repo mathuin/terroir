@@ -101,7 +101,7 @@ func (w World) Write() error {
 	return nil
 }
 
-func ReadWorld(dir string, name string) (*World, error) {
+func ReadWorld(dir string, name string, loadAllChunks bool) (*World, error) {
 
 	var spawn Point
 	var rSeed int64
@@ -173,46 +173,10 @@ func ReadWorld(dir string, name string) (*World, error) {
 	w.SetRandomSeed(rSeed)
 	w.SetSpawn(spawn)
 
-	// for file in region dir
-	regionRE, err := regexp.Compile("r\\.(-?\\d*)\\.(-?\\d*)\\.mca")
-	regionDir := path.Join(worldDir, "region")
-	rd, err := ioutil.ReadDir(regionDir)
-	if err != nil {
-		return nil, err
-	}
-	for _, fi := range rd {
-		matches := regionRE.FindAllStringSubmatch(fi.Name(), -1)
-		if matches == nil {
-			continue
+	if loadAllChunks {
+		if err := w.loadAllChunksFromAllRegions(); err != nil {
+			return nil, err
 		}
-		match := matches[0]
-		// mfn := match[0]
-		outx, xerr := strconv.ParseInt(match[1], 10, 32)
-		if xerr != nil {
-			panic(xerr)
-		}
-		outz, zerr := strconv.ParseInt(match[2], 10, 32)
-		if zerr != nil {
-			panic(zerr)
-		}
-		// rname := path.Join(regionDir, mfn)
-		// if Debug {
-		// 	log.Printf("Reading region file %s", rname)
-		// }
-		// r, rerr := os.Open(rname)
-		// if rerr != nil {
-		// 	panic(rerr)
-		// }
-		// defer r.Close()
-		// n, rerr := w.ReadRegion(r, int32(outx), int32(outz))
-		rXZ := XZ{X: int32(outx), Z: int32(outz)}
-		_, rerr := w.loadAllChunksFromRegion(rXZ)
-		if rerr != nil {
-			panic(rerr)
-		}
-		// if Debug {
-		// 	log.Printf("... read %d chunks", n)
-		// }
 	}
 
 	return &w, nil
@@ -335,14 +299,14 @@ func (w *World) loadChunk(cXZ XZ) (*Chunk, error) {
 
 	_, lerr := r.Seek(int64(cindex*4), os.SEEK_SET)
 	if lerr != nil {
-		panic(lerr)
+		return nil, lerr
 	}
 
 	var location int32
 
 	err = binary.Read(r, binary.BigEndian, &location)
 	if err != nil {
-		panic(err)
+		return nil, err
 	}
 
 	if location == 0 {
@@ -380,5 +344,44 @@ func (w *World) addChunkToMaps(c Chunk) error {
 		}
 	}
 	w.RegionMap[rXZ] = append(w.RegionMap[rXZ], cXZ)
+	return nil
+}
+
+func (w *World) loadAllChunksFromAllRegions() error {
+	rXZList := make([]XZ, 0)
+
+	regionRE, err := regexp.Compile("r\\.(-?\\d*)\\.(-?\\d*)\\.mca")
+	regionDir := path.Join(w.SaveDir, w.Name, "region")
+	rd, err := ioutil.ReadDir(regionDir)
+	if err != nil {
+		return err
+	}
+
+	for _, fi := range rd {
+		matches := regionRE.FindAllStringSubmatch(fi.Name(), -1)
+		if matches == nil {
+			continue
+		}
+		match := matches[0]
+		outx, xerr := strconv.ParseInt(match[1], 10, 32)
+		if xerr != nil {
+			return xerr
+		}
+		outz, zerr := strconv.ParseInt(match[2], 10, 32)
+		if zerr != nil {
+			return zerr
+		}
+
+		rXZ := XZ{X: int32(outx), Z: int32(outz)}
+		rXZList = append(rXZList, rXZ)
+	}
+
+	for _, rXZ := range rXZList {
+		// TODO: parallelize this .. or skip it entirely!
+		_, rerr := w.loadAllChunksFromRegion(rXZ)
+		if rerr != nil {
+			return rerr
+		}
+	}
 	return nil
 }
