@@ -237,7 +237,7 @@ func WriteChunkToRegion(in chan Chunk, out chan CTROut, i int) {
 		}
 		cout.arroff = cz*32 + cx
 		if Debug {
-			log.Printf("arroff: (%d, %d) -> %d * 32 + %d = %d", i, c.xPos, c.zPos, cz, cx, cout.arroff)
+			log.Printf("arroff: (%d, %d) -> %d * 32 + %d = %d", c.xPos, c.zPos, cz, cx, cout.arroff)
 		}
 
 		// write chunk to compressed buffer
