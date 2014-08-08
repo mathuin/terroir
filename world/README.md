@@ -155,3 +155,45 @@ Compound "": root tag
   * List "TileEntities": list of Compounds (ditto)
   * List "TileTicks": may not exist (so it won't)
 
+## Blocks
+
+Values shown for some items are not the default!
+
+ * Wheat, Carrot, Potato, Pumpkin Stem, and Melon Stem are all full-grown
+
+Some value range are not included because the server will handle it for us.
+
+ * Redstone (wire, repeaters, comparators), Daylight Sensors, Farmland
+
+Many other things are not supported because they are currently outside the scope of this project.  If someone else wants to add them, pull requests are accepted!
+
+ * Torches and Redstone Torches
+ * Piston and Piston Extension
+ * Stairs
+ * Beds
+ * Signs
+ * Doors
+ * Rails
+ * Ladders, Wall Signs, Furnaces, Chest (facing/attached)
+ * Dispensers, Droppers, Hoppers (down, up, powered)
+ * Levers (power, facing, wall/ground/ceiling)
+ * Pressure Plates (pressed or not)
+ * Buttons (set, direction)
+ * Snow (depth)
+ * Jukebox
+ * Pumpkins and Jack o'Lanterns
+ * Cake
+ * Redstone Repeaters and Comparators
+ * Trapdoors
+ * Monster Eggs
+ * Huge mushrooms
+ * Vines
+ * Fence Gates
+ * Nether Wart
+ * Brewing Stand
+ * Cauldron
+ * End Portal Block
+ * Cocoa
+ * Tripwire and Tripwire Hook
+ * Heads
+

@@ -28,7 +28,7 @@ func (w World) Block(pt Point) (*Block, error) {
 	return &b, nil
 }
 
-func (w *World) SetBlock(pt Point, b Block) error {
+func (w *World) SetBlock(pt Point, b *Block) error {
 	base := byte(b.block % 256)
 	add := byte(b.block / 256)
 	s, err := w.Section(pt)
@@ -42,38 +42,20 @@ func (w *World) SetBlock(pt Point, b Block) error {
 	return nil
 }
 
-var BlockNames = map[string]Block{}
+var blockNames = map[string]Block{}
 
 func BlockNamed(name string) (*Block, error) {
-	if val, ok := BlockNames[name]; ok {
+	if val, ok := blockNames[name]; ok {
 		return &val, nil
 	}
 	return nil, fmt.Errorf("block with name %s does not exist!", name)
 }
 
 func (b Block) BlockName() (string, error) {
-	for name := range BlockNames {
-		if BlockNames[name] == b {
+	for name := range blockNames {
+		if blockNames[name] == b {
 			return name, nil
 		}
 	}
 	return "", fmt.Errorf("block %v has no name!", b)
-}
-
-func init() {
-	for _, bd := range BlockData {
-		b := MakeBlock(bd.Block, bd.Data)
-		for _, name := range bd.Names {
-			BlockNames[name] = b
-		}
-	}
-}
-
-var BlockData = []struct {
-	Block int
-	Data  int
-	Names []string
-}{
-	{0, 0, []string{"Air", "Empty"}},
-	{1, 0, []string{"Stone"}},
 }

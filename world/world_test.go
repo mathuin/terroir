@@ -98,7 +98,10 @@ func Test_FullReadWriteRead(t *testing.T) {
 	}
 
 	// set two points to obsidian
-	obsidian := MakeBlock(49, 0)
+	obsidian, err := BlockNamed("Obsidian")
+	if err != nil {
+		t.Fail()
+	}
 	pt := MakePoint(0, 60, 0)
 	pt2 := MakePoint(1, 60, 0)
 	nw.SetBlock(pt, obsidian)
@@ -106,7 +109,7 @@ func Test_FullReadWriteRead(t *testing.T) {
 
 	newSaveDir, nerr := ioutil.TempDir("", "")
 	if nerr != nil {
-		panic(nerr)
+		t.Fail()
 	}
 	defer os.RemoveAll(newSaveDir)
 
@@ -132,10 +135,10 @@ func Test_FullReadWriteRead(t *testing.T) {
 		t.Fail()
 	}
 
-	if *nbval != obsidian {
+	if nbval != obsidian {
 		t.Errorf("nbval %v is not equal to obsidian %v", nbval, obsidian)
 	}
-	if *nb2val != obsidian {
+	if nb2val != obsidian {
 		t.Errorf("nb2val %v is not equal to obsidian %v", nb2val, obsidian)
 	}
 }
@@ -151,14 +154,14 @@ func Test_tinyWorld(t *testing.T) {
 	// points and values for the world
 	var points = []struct {
 		p Point
-		b Block
+		s string
 	}{
-		{Point{X: 7, Y: 85, Z: 7}, Block{49, 0}},
-		{Point{X: 8, Y: 85, Z: 7}, Block{49, 0}},
-		{Point{X: 7, Y: 86, Z: 7}, Block{0, 0}},
-		{Point{X: 8, Y: 86, Z: 7}, Block{0, 0}},
-		{Point{X: 7, Y: 87, Z: 7}, Block{0, 0}},
-		{Point{X: 8, Y: 87, Z: 7}, Block{0, 0}},
+		{Point{X: 7, Y: 85, Z: 7}, "Obsidian"},
+		{Point{X: 8, Y: 85, Z: 7}, "Obsidian"},
+		{Point{X: 7, Y: 86, Z: 7}, "Air"},
+		{Point{X: 8, Y: 86, Z: 7}, "Air"},
+		{Point{X: 7, Y: 87, Z: 7}, "Air"},
+		{Point{X: 8, Y: 87, Z: 7}, "Air"},
 	}
 
 	w := MakeWorld(worldName)
@@ -169,7 +172,11 @@ func Test_tinyWorld(t *testing.T) {
 
 	// set the points
 	for _, pv := range points {
-		w.SetBlock(pv.p, pv.b)
+		b, err := BlockNamed(pv.s)
+		if err != nil {
+			t.Fail()
+		}
+		w.SetBlock(pv.p, b)
 	}
 
 	// now write the level
@@ -190,8 +197,12 @@ func Test_tinyWorld(t *testing.T) {
 		if err != nil {
 			t.Fail()
 		}
-		if *b != pv.b {
-			t.Errorf("Point #%d: (%v) expected %v, got %v", i, pv.p, pv.b, *b)
+		bn, err := b.BlockName()
+		if err != nil {
+			t.Fail()
+		}
+		if bn != pv.s {
+			t.Errorf("Point #%d: (%v) expected %s, got %s", i, pv.p, pv.s, bn)
 		}
 	}
 }
