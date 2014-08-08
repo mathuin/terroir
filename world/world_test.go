@@ -37,7 +37,8 @@ func Test_worldWriteRead(t *testing.T) {
 	defer r.Close()
 
 	// readregion here
-	n, rerr := w.ReadRegion(r, int32(rx), int32(rz))
+	rXZ := XZ{X: int32(rx), Z: int32(rz)}
+	n, rerr := w.loadAllChunksFromRegion(rXZ)
 	if rerr != nil {
 		panic(rerr)
 	}
@@ -62,7 +63,7 @@ func Test_worldWriteRead(t *testing.T) {
 	nw.SetSaveDir(td)
 	nw.Write()
 
-	sw, swerr := ReadWorld(td, newWorldName)
+	sw, swerr := ReadWorld(td, newWorldName, false)
 	if swerr != nil {
 		t.Fail()
 	}
@@ -77,7 +78,7 @@ func Test_FullReadWriteRead(t *testing.T) {
 	worldName := "TerroirTest"
 	newWorldName := "TerroirTwo"
 
-	w, err := ReadWorld(saveDir, worldName)
+	w, err := ReadWorld(saveDir, worldName, true)
 	if err != nil {
 		t.Fail()
 	}
@@ -115,7 +116,7 @@ func Test_FullReadWriteRead(t *testing.T) {
 	}
 
 	// read it back
-	sw, serr := ReadWorld(newSaveDir, newWorldName)
+	sw, serr := ReadWorld(newSaveDir, newWorldName, true)
 	if serr != nil {
 		t.Fail()
 	}
@@ -123,7 +124,6 @@ func Test_FullReadWriteRead(t *testing.T) {
 	// check value of some particular block
 	nbval, err := sw.Block(pt)
 	if err != nil {
-		log.Panic(err)
 		t.Fail()
 	}
 	nb2val, err := sw.Block(pt2)
@@ -137,5 +137,61 @@ func Test_FullReadWriteRead(t *testing.T) {
 	}
 	if nb2val != obsidian {
 		t.Errorf("nb2val %v is not equal to obsidian %v", nb2val, obsidian)
+	}
+}
+
+func Test_tinyWorld(t *testing.T) {
+	worldName := "PointTest"
+	td, nerr := ioutil.TempDir("", "")
+	if nerr != nil {
+		t.Fail()
+	}
+	defer os.RemoveAll(td)
+
+	// points and values for the world
+	var points = []struct {
+		p Point
+		v int
+	}{
+		{Point{X: 7, Y: 85, Z: 7}, 49},
+		{Point{X: 8, Y: 85, Z: 7}, 49},
+		{Point{X: 7, Y: 86, Z: 7}, 0},
+		{Point{X: 8, Y: 86, Z: 7}, 0},
+		{Point{X: 7, Y: 87, Z: 7}, 0},
+		{Point{X: 8, Y: 87, Z: 7}, 0},
+	}
+
+	w := MakeWorld(worldName)
+	w.SetSaveDir(td)
+	spawnPoint := points[0].p
+	w.SetSpawn(spawnPoint)
+	w.SetRandomSeed(0)
+
+	// set the points
+	for _, pv := range points {
+		w.SetBlock(pv.p, pv.v)
+	}
+
+	// now write the level
+	err := w.Write()
+	if err != nil {
+		t.Fail()
+	}
+
+	// now read the level again
+	nw, err := ReadWorld(td, worldName, false)
+	if err != nil {
+		t.Fail()
+	}
+
+	// are those blocks still set?
+	for i, pv := range points {
+		v, err := nw.Block(pv.p)
+		if err != nil {
+			t.Fail()
+		}
+		if v != pv.v {
+			t.Errorf("Point #%d: (%v) expected %d, got %d", i, pv.p, pv.v, v)
+		}
 	}
 }
