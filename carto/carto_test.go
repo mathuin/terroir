@@ -2,6 +2,7 @@ package carto
 
 import (
 	"io/ioutil"
+	"os"
 	"path"
 	"testing"
 
@@ -12,7 +13,6 @@ import (
 
 // more like integration tests
 
-// VRTs don't yet work...
 var elFile = "/home/jmt/git/mathuin/TopoMC/downloads/elevation/imgn42w072_13.img"
 var lcFile = "/media/jmt/My Book/data/landcover/2011/nlcd_2011_landcover_2011_edition_2014_03_31.img"
 
@@ -40,6 +40,33 @@ var wgs84Extents = map[string]FloatExtents{
 	"landcover": {-71.47980755995131, -71.68425418133639, 41.309590101757536, 41.11853504487958},
 }
 
+var maybemaketiffs_tests = []struct {
+	ll     FloatExtents
+	elvrt  string
+	elfile string
+}{
+	{
+		FloatExtents{-71.533, -71.62, 41.238, 41.142},
+		"/media/jmt/My Book/data/elevation/13/elevation13.vrt",
+		"elevation.tif",
+	},
+}
+
+func Test_maybemaketiffs(t *testing.T) {
+	td, nerr := ioutil.TempDir("", "")
+	if nerr != nil {
+		panic(nerr)
+	}
+	defer os.RemoveAll(td)
+	for _, tt := range maybemaketiffs_tests {
+		realfile := path.Join(td, tt.elfile)
+		r := MakeRegion("Pie", tt.ll)
+		r.vrts["elevation"] = tt.elvrt
+		r.files["elevation"] = realfile
+		// r.maybemaketiffs()
+	}
+}
+
 var buildMap_tests = []struct {
 	ll     FloatExtents
 	elvrt  string
@@ -57,7 +84,7 @@ func Test_buildMap(t *testing.T) {
 	if nerr != nil {
 		panic(nerr)
 	}
-	// defer os.RemoveAll(td)
+	defer os.RemoveAll(td)
 	for _, tt := range buildMap_tests {
 		realfile := path.Join(td, tt.elfile)
 		r := MakeRegion("Pie", tt.ll)
