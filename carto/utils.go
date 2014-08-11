@@ -1,6 +1,9 @@
 package carto
 
-import "log"
+import (
+	"log"
+	"os"
+)
 
 type CartoError error
 
@@ -72,4 +75,15 @@ func min(a int, b int) int {
 		return a
 	}
 	return b
+}
+
+func remove(name string) {
+	mstat, _ := os.Stat(name)
+	if mstat != nil {
+		rerr := os.Remove(name)
+		if rerr != nil {
+			// JMT: I don't think I need to check this
+			log.Printf(rerr.Error())
+		}
+	}
 }
