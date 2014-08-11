@@ -40,7 +40,7 @@ var wgs84Extents = map[string]FloatExtents{
 	"landcover": {-71.47980755995131, -71.68425418133639, 41.309590101757536, 41.11853504487958},
 }
 
-var maketiff_tests = []struct {
+var buildMap_tests = []struct {
 	ll     FloatExtents
 	elvrt  string
 	elfile string
@@ -52,17 +52,17 @@ var maketiff_tests = []struct {
 	},
 }
 
-func Test_maketiffs(t *testing.T) {
+func Test_buildMap(t *testing.T) {
 	td, nerr := ioutil.TempDir("", "")
 	if nerr != nil {
 		panic(nerr)
 	}
 	// defer os.RemoveAll(td)
-	for _, tt := range maketiff_tests {
+	for _, tt := range buildMap_tests {
 		realfile := path.Join(td, tt.elfile)
 		r := MakeRegion("Pie", tt.ll)
 		r.vrts["elevation"] = tt.elvrt
 		r.files["elevation"] = realfile
-		r.maketiffs()
+		r.buildMap()
 	}
 }

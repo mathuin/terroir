@@ -3,6 +3,8 @@ package carto
 import (
 	"fmt"
 	"log"
+	"math"
+	"os"
 	"os/exec"
 	"path"
 
@@ -195,7 +197,7 @@ func (r Region) maybemaketiffs() {
 
 }
 
-func (r Region) maketiffs() {
+func (r Region) buildMap() {
 	elextents := r.albers["elevation"]
 
 	path, err := exec.LookPath("gdalwarp")
@@ -205,30 +207,93 @@ func (r Region) maketiffs() {
 
 	warpcmd := exec.Command(path, `-q`, `-multi`, `-t_srs`, albers_proj, `-tr`, fmt.Sprintf("%d", r.scale), fmt.Sprintf("%d", r.scale), `-te`, fmt.Sprintf("%d", elextents[xMin]), fmt.Sprintf("%d", elextents[yMin]), fmt.Sprintf("%d", elextents[xMax]), fmt.Sprintf("%d", elextents[yMax]), `-r`, `cubic`, `-srcnodata`, `"-340282346638529993179660072199368212480.000"`, `-dstnodata`, `0`, fmt.Sprintf(`%s`, r.vrts["elevation"]), fmt.Sprintf(`%s`, r.files["elevation"]))
 
-	out, nerr := warpcmd.Output()
+	// remove elevation file if necessary
+	stat, _ := os.Stat(r.files["elevation"])
+	if stat != nil {
+		rerr := os.Remove(r.files["elevation"])
+		if rerr != nil {
+			// JMT: I don't think I need to check this
+			log.Printf(rerr.Error())
+		}
+	}
+
+	// run the command
+	_, nerr := warpcmd.Output()
 	if nerr != nil {
 		panic(nerr)
 	}
 
 	// open elds
+	elDS, err := gdal.Open(elFile, gdal.ReadOnly)
+	if err != nil {
+		panic(err)
+	}
+	defer elDS.Close()
+	rXsize := elDS.RasterXSize()
+	rYsize := elDS.RasterYSize()
+	log.Printf("Dataset size: %d, %d", rXsize, rYsize)
+
 	// get transform
+	elGT := elDS.GeoTransform()
+	_ = elGT
+
 	// get band
+	elBand := elDS.RasterBand(1)
+	log.Print("Band type: ", elBand.RasterDataType().Name())
+	xBlock, yBlock := elBand.BlockSize()
+	log.Print("Block size: ", xBlock, ", ", yBlock)
+
 	// get array
+	elBuffer := make([]float32, rXsize*rYsize)
+	elrerr := elBand.IO(gdal.Read, 0, 0, rXsize, rYsize, elBuffer, rXsize, rYsize, 0, 0)
+	if notnil(elrerr) {
+		panic(elrerr)
+	}
 	// get sizes
 
 	// get elmin and elmax
+	elMin, minok := elBand.GetMinimum()
+	elMax, maxok := elBand.GetMaximum()
 	// if none, compute
-
+	if !minok || !maxok {
+		elMin, elMax = elBand.ComputeMinMax(0)
+	}
+	log.Print("Min = ", elMin)
+	log.Print("Max = ", elMax)
 	// close elband
 	// close elds
+	// (covered by defers)
 
 	// check sealevel against elmin
+	minsealevel := 2
+	if elMin < 0 {
+		minsealevel = minsealevel + int(-1.0*elMin/float64(r.scale))
+	}
+	maxsealevel := tileheight - headroom
+
+	r.sealevel = setIntValue("sealevel", r.sealevel, maxsealevel, minsealevel)
+	log.Print("sealevel: ", r.sealevel)
 
 	// check maxdepth against sealevel
+	minmaxdepth := 1
+	maxmaxdepth := r.sealevel - 1
+	r.maxdepth = setIntValue("maxdepth", r.maxdepth, maxmaxdepth, minmaxdepth)
+	log.Print("maxdepth: ", r.maxdepth)
 
 	// check trim against elmin
+	mintrim := 0
+	maxtrim := max(int(elMin), mintrim)
+	r.trim = setIntValue("trim", r.trim, maxtrim, mintrim)
+	log.Print("trim: ", r.trim)
 
 	// vscale depends on sealevel, trim, elmax
+	eltrimmed := float64(elMax - float64(r.trim))
+	elroom := float64(tileheight - headroom - r.sealevel)
+	minvscale := int(math.Ceil(eltrimmed / elroom))
+	// NB: no real maximum vscale
+	maxvscale := 99999
+	r.vscale = setIntValue("vscale", r.vscale, maxvscale, minvscale)
+	log.Print("vscale: ", r.vscale)
 
 	// BUILD A DAMNED GEOTIFF
 	// still have to generate elevation array, crust array, landcover array, depth array!

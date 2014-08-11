@@ -1,5 +1,7 @@
 package carto
 
+import "log"
+
 type CartoError error
 
 func notnil(err error) bool {
@@ -48,4 +50,26 @@ func (arr Float64Arr) max() (m float64) {
 		}
 	}
 	return
+}
+
+func setIntValue(name string, old int, mymax int, mymin int) int {
+	if old > mymax || old < mymin {
+		log.Printf("warning: %s %d outside %d-%d range", name, old, mymin, mymax)
+	}
+
+	return int(min(max(old, mymin), mymax))
+}
+
+func max(a int, b int) int {
+	if a > b {
+		return a
+	}
+	return b
+}
+
+func min(a int, b int) int {
+	if a < b {
+		return a
+	}
+	return b
 }
