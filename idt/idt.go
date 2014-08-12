@@ -57,9 +57,18 @@ func (idt IDT) Call(base [][2]int, nnear int, majority bool) (outarr []int16, er
 
 	var wg sync.WaitGroup
 
-	for i := 0; i < runtime.NumCPU(); i++ {
+	if Debug {
+		log.Printf("Now running IDT on %d CPUs!", runtime.NumCPU())
+	}
+
+	nCPU := runtime.NumCPU()
+	runtime.GOMAXPROCS(nCPU)
+	for i := 0; i < nCPU*nCPU; i++ {
 		go func(i int) {
 			wg.Add(1)
+			if Debug {
+				log.Printf("Starting reducer #%d!", i)
+			}
 			idt.Reduce(in, out, nnear, majority, i)
 			wg.Done()
 		}(i)
