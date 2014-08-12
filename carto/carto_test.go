@@ -44,15 +44,18 @@ var maybemaketiffs_tests = []struct {
 	ll     FloatExtents
 	elvrt  string
 	elfile string
+	lcfile string
 }{
 	{
-		FloatExtents{-71.533, -71.62, 41.238, 41.142},
+		// FloatExtents{-71.533, -71.62, 41.238, 41.142},
+		FloatExtents{-71.575, -71.576, 41.189, 41.191},
 		"/media/jmt/My Book/data/elevation/13/elevation13.vrt",
 		"elevation.tif",
+		"/media/jmt/My Book/data/landcover/2011/nlcd_2011_landcover_2011_edition_2014_03_31.img",
 	},
 }
 
-func Test_maybemaketiffs(t *testing.T) {
+func NOTest_maybemaketiffs(t *testing.T) {
 	td, nerr := ioutil.TempDir("", "")
 	if nerr != nil {
 		panic(nerr)
@@ -63,6 +66,7 @@ func Test_maybemaketiffs(t *testing.T) {
 		r := MakeRegion("Pie", tt.ll)
 		r.vrts["elevation"] = tt.elvrt
 		r.files["elevation"] = realfile
+		r.files["landcover"] = tt.lcfile
 		// r.maybemaketiffs()
 	}
 }
@@ -71,11 +75,16 @@ var buildMap_tests = []struct {
 	ll     FloatExtents
 	elvrt  string
 	elfile string
+	lcfile string
 }{
 	{
 		FloatExtents{-71.533, -71.62, 41.238, 41.142},
-		"/media/jmt/My Book/data/elevation/13/elevation13.vrt",
+		// FloatExtents{-71.575, -71.576, 41.189, 41.191},
+		// "/media/jmt/My Book/data/elevation/13/elevation13.vrt",
+		"/home/jmt/git/mathuin/TopoMC/regions/BlockIsland/Datasets/elevation.vrt",
 		"elevation.tif",
+		//"/media/jmt/My Book/data/landcover/2011/nlcd_2011_landcover_2011_edition_2014_03_31.img",
+		"/home/jmt/git/mathuin/TopoMC/regions/BlockIsland/Datasets/landcover.vrt",
 	},
 }
 
@@ -90,6 +99,9 @@ func Test_buildMap(t *testing.T) {
 		r := MakeRegion("Pie", tt.ll)
 		r.vrts["elevation"] = tt.elvrt
 		r.files["elevation"] = realfile
+		r.files["landcover"] = tt.lcfile
+		Debug = true
 		r.buildMap()
+		Debug = false
 	}
 }

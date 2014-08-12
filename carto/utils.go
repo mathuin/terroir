@@ -80,6 +80,9 @@ func min(a int, b int) int {
 func remove(name string) {
 	mstat, _ := os.Stat(name)
 	if mstat != nil {
+		if Debug {
+			log.Printf("removing %s", name)
+		}
 		rerr := os.Remove(name)
 		if rerr != nil {
 			// JMT: I don't think I need to check this
