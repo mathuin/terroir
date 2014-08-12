@@ -5,59 +5,74 @@ import (
 	"log"
 	"strings"
 
-	"github.com/lukeroth/gdal"
+	"github.com/mathuin/gdal"
 )
 
-func (r Region) bathy(darr []int16, depthx int, depthy int, gt [6]float64, proj string) []int16 {
-	memdrv, err := gdal.GetDriverByName("MEM")
-	if err != nil {
-		panic(err)
+func (r Region) bathy(inarr []int16, inx int, iny int) []int16 {
+	inprod := inx * iny
+
+	// mem driver!
+	memdrv, err1 := gdal.GetDriverByName("MEM")
+	if err1 != nil {
+		panic(err1)
 	}
-	depthDS := memdrv.Create("depth", depthx, depthy, 1, gdal.Int16, nil)
-	depthDS.SetGeoTransform(gt)
-	depthDS.SetProjection(proj)
-	depthBand := depthDS.RasterBand(1)
-	deptherr := depthBand.IO(gdal.Write, 0, 0, depthx, depthy, darr, depthx, depthy, 0, 0)
-	if notnil(deptherr) {
-		panic(deptherr)
+
+	// create a source band from that array
+	srcDS := memdrv.Create("src", inx, iny, 1, gdal.Int16, nil)
+	srcBand := srcDS.RasterBand(1)
+	err2 := srcBand.IO(gdal.Write, 0, 0, inx, iny, inarr, inx, iny, 0, 0)
+	if err2 != nil && err2.Error() != "No Error" {
+		panic(err2)
 	}
-	bathyDS := memdrv.Create("bathy", depthx, depthy, 1, gdal.Int16, nil)
-	bathyDS.SetGeoTransform(gt)
-	bathyDS.SetProjection(proj)
-	bathyBand := bathyDS.RasterBand(1)
+
+	// create a target band
+	destDS := memdrv.Create("dest", inx, iny, 1, gdal.Int16, nil)
+	destBand := destDS.RasterBand(1)
+
+	// someday water may not be so simple
+	not11 := nomatch(inarr, []int16{11})
+	log.Print("not11: ", not11)
+
+	// configure options
+	maxdepth := 2
+	options := []string{fmt.Sprintf("MAXDIST=%d", maxdepth), fmt.Sprintf("NODATA=%d", maxdepth), fmt.Sprintf("VALUES=%s", strings.Join(not11, ","))}
+
+	// run computeproximity
+	err3 := srcBand.ComputeProximity(destBand, options, gdal.ScaledProgress, nil)
+	if err3 != nil && err3.Error() != "No Error" {
+		panic(err3)
+	}
+
+	// get output
+	outarr := make([]int16, inprod)
+	err4 := destBand.IO(gdal.Read, 0, 0, inx, iny, outarr, inx, iny, 0, 0)
+	if err4 != nil && err4.Error() != "No Error" {
+		panic(err4)
+	}
+
+	return outarr
+}
+
+// a list of all the numbers in the incoming array
+// that don't any of the specified values
+func nomatch(arr []int16, ints []int16) []string {
 
 	dmap := make(map[int16]bool)
-	for _, v := range darr {
+	for _, v := range arr {
 		if _, ok := dmap[v]; !ok {
 			dmap[v] = true
 		}
 	}
-	not11 := []string{}
+
+	for _, v := range ints {
+		delete(dmap, v)
+	}
+
+	retval := []string{}
+
 	for k := range dmap {
-		if k != 11 {
-			not11 = append(not11, fmt.Sprintf("%d", k))
-		}
-	}
-	log.Print("not11: ", not11)
-
-	options := []string{fmt.Sprintf("MAXDIST=%d", r.maxdepth), fmt.Sprintf("NODATA=%d", r.maxdepth), fmt.Sprintf("VALUES=%s", strings.Join(not11, ","))}
-	if Debug {
-		log.Print("options: ", options)
+		retval = append(retval, fmt.Sprintf("%d", k))
 	}
 
-	// JMT: failure error gets thrown.  source says that happens when
-	// pointers fail validation and when distunits is set incorrectly.
-	cperr := depthBand.ComputeProximity(bathyBand, options, gdal.DummyProgress, nil)
-	if cperr != nil {
-		log.Panicf(cperr.Error())
-	}
-
-	resXsize := depthx - 2*r.maxdepth
-	resYsize := depthy - 2*r.maxdepth
-	results := make([]int16, resXsize*resYsize)
-	bathyerr := bathyBand.IO(gdal.Read, r.maxdepth, r.maxdepth, resXsize, resYsize, results, resXsize, resYsize, 0, 0)
-	if notnil(bathyerr) {
-		panic(bathyerr)
-	}
-	return results
+	return retval
 }
