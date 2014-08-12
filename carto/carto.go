@@ -8,6 +8,7 @@ import (
 	"path"
 
 	"github.com/lukeroth/gdal"
+	"github.com/mathuin/terroir/idt"
 )
 
 var Debug = false
@@ -181,9 +182,7 @@ func (r Region) maybemaketiffs() {
 	if Debug {
 		log.Print("before first IO")
 	}
-	// vBuffer := make([]float32, txarrSize*tyarrSize)
 	vBuffer := make([]float32, rXsize*rYsize)
-	// ioerr := vBand.IO(gdal.Read, xOff, yOff, xSize, ySize, vBuffer, txarrSize, tyarrSize, 0, 0)
 	ioerr := vBand.IO(gdal.Read, 0, 0, rXsize, rYsize, vBuffer, rXsize, rYsize, 0, 0)
 	if notnil(ioerr) {
 		panic(ioerr)
@@ -242,10 +241,12 @@ func (r Region) buildMap() {
 	remove(r.files["elevation"])
 
 	// run the command
-	_, nerr := warpcmd.Output()
-	if nerr != nil {
+	out, nerr := warpcmd.Output()
+	if notnil(nerr) {
+		log.Panic(out)
 		panic(nerr)
 	}
+	_ = out
 
 	// open elds
 	elDS, err := gdal.Open(r.files["elevation"], gdal.ReadOnly)
@@ -265,25 +266,26 @@ func (r Region) buildMap() {
 		log.Printf("Origin: %f, %f", elGT[0], elGT[3])
 		log.Printf("Pixel Size: %f, %f", elGT[1], elGT[5])
 	}
-	xOff := (float64(elExtents[xMin]) - elGT[0]) / elGT[1]
-	yOff := (float64(elExtents[yMax]) - elGT[3]) / elGT[5]
 	if Debug {
+		xOff := (float64(elExtents[xMin]) - elGT[0]) / elGT[1]
+		yOff := (float64(elExtents[yMax]) - elGT[3]) / elGT[5]
 		log.Printf("Offset: %f, %f", xOff, yOff)
 	}
-	xSize := float64(elExtents[xMax]-elExtents[xMin]) / elGT[1]
-	ySize := float64(elExtents[yMin]-elExtents[yMax]) / elGT[5]
 	if Debug {
+		xSize := float64(elExtents[xMax]-elExtents[xMin]) / elGT[1]
+		ySize := float64(elExtents[yMin]-elExtents[yMax]) / elGT[5]
 		log.Printf("Size: %f, %f", xSize, ySize)
 	}
 
 	// get band
 	elBand := elDS.RasterBand(1)
 	if Debug {
-		log.Print("Band type: ", elBand.RasterDataType().Name())
+		log.Print("EL Band type: ", elBand.RasterDataType().Name())
 	}
 
 	// get array
-	elBuffer := make([]float32, rXsize*rYsize)
+	bufferLen := rXsize * rYsize
+	elBuffer := make([]float32, bufferLen)
 	elrerr := elBand.IO(gdal.Read, 0, 0, rXsize, rYsize, elBuffer, rXsize, rYsize, 0, 0)
 	if notnil(elrerr) {
 		panic(elrerr)
@@ -345,6 +347,9 @@ func (r Region) buildMap() {
 	}
 
 	// build a four-layer GeoTIFF
+	if Debug {
+		log.Print("build four-layer GeoTIFF")
+	}
 	driver, derr := gdal.GetDriverByName("GTiff")
 	if derr != nil {
 		panic(err)
@@ -366,17 +371,220 @@ func (r Region) buildMap() {
 	}
 	mapDS.SetProjection(mapWKT)
 
-	// transform the elevation erray
-	newelBuffer := make([]int16, len(elBuffer))
-	for i, v := range elBuffer {
-		newelBuffer[i] = int16((int(v-float32(r.trim)) / r.vscale) + r.sealevel)
+	// transform the elevation array
+	if Debug {
+		log.Print("transform the elevation array")
+	}
+	newelBuffer := r.elev(elBuffer)
+	elRaster := mapDS.RasterBand(Elevation)
+	eioerr := elRaster.IO(gdal.Write, 0, 0, rXsize, rYsize, newelBuffer, rXsize, rYsize, 0, 0)
+	if notnil(eioerr) {
+		panic(eioerr)
 	}
 
-	// write the elevation array to the mapDS raster
-	elRaster := mapDS.RasterBand(Elevation)
-	elRaster.IO(gdal.Write, 0, 0, rXsize, rYsize, newelBuffer, rXsize, rYsize, 0, 0)
+	// write the crust array to the raster
+	if Debug {
+		log.Print("generate crust array")
+	}
+	crustBuffer := r.crust(rXsize, rYsize)
+	crustRaster := mapDS.RasterBand(Crust)
+	crusterr := crustRaster.IO(gdal.Write, 0, 0, rXsize, rYsize, crustBuffer, rXsize, rYsize, 0, 0)
+	if notnil(crusterr) {
+		panic(crusterr)
+	}
 
-	crustBuffer := make([]int16, len(elBuffer))
-	_ = crustBuffer
-	// ... screeching halt until I write IDTs in Go.
+	// landcover and depth follow
+	if Debug {
+		log.Print("retrieve landcover data")
+	}
+	lcExtents := r.albers["landcover"]
+
+	lcDS, err := gdal.Open(r.files["landcover"], gdal.ReadOnly)
+	if err != nil {
+		panic(err)
+	}
+	defer lcDS.Close()
+	if Debug {
+		lcrXsize := lcDS.RasterXSize()
+		lcrYsize := lcDS.RasterYSize()
+		log.Printf("Dataset size: %d, %d", lcrXsize, lcrYsize)
+	}
+
+	// get transform
+	lcGT := lcDS.GeoTransform()
+	lcxmin := int((float64(lcExtents[xMin]) - lcGT[0]) / lcGT[1])
+	lcxmax := int((float64(lcExtents[xMax]) - lcGT[0]) / lcGT[1])
+	lcymin := int((float64(lcExtents[yMax]) - lcGT[3]) / lcGT[5])
+	lcymax := int((float64(lcExtents[yMin]) - lcGT[3]) / lcGT[5])
+	lcxlen := lcxmax - lcxmin
+	lcylen := lcymax - lcymin
+	if Debug {
+		log.Printf("Origin: %f, %f", lcGT[0], lcGT[3])
+		log.Printf("Pixel Size: %f, %f", lcGT[1], lcGT[5])
+	}
+	if Debug {
+		lcxOff := (float64(lcExtents[xMin]) - lcGT[0]) / lcGT[1]
+		lcyOff := (float64(lcExtents[yMax]) - lcGT[3]) / lcGT[5]
+		log.Printf("Offset: %f, %f", lcxOff, lcyOff)
+	}
+	if Debug {
+		lcxSize := float64(lcExtents[xMax]-lcExtents[xMin]) / lcGT[1]
+		lcySize := float64(lcExtents[yMin]-lcExtents[yMax]) / lcGT[5]
+		log.Printf("Size: %f, %f", lcxSize, lcySize)
+	}
+
+	// get band
+	if Debug {
+		log.Print("Get landcover band")
+	}
+	lcBand := lcDS.RasterBand(1)
+	if Debug {
+		log.Print("LC Band type: ", lcBand.RasterDataType().Name())
+	}
+
+	// get array
+	if Debug {
+		log.Print("Get landcover array")
+	}
+	lcbufferLen := lcxlen * lcylen
+	lcBuffer := make([]byte, lcbufferLen)
+	lcrerr := lcBand.IO(gdal.Read, lcxmin, lcymin, lcxlen, lcylen, lcBuffer, lcxlen, lcylen, 0, 0)
+	if notnil(lcrerr) {
+		panic(lcrerr)
+	}
+
+	lchist := make(map[byte]int)
+	for _, b := range lcBuffer {
+		lchist[b]++
+	}
+	for k, v := range lchist {
+		log.Printf("lchist[%d] = %d", int(k), v)
+	}
+
+	if Debug {
+		log.Print("Get landcover nodata")
+	}
+	lcNodata, ok := lcBand.NoDataValue()
+	if !ok {
+		lcNodata = 0
+	}
+	// nodata is treated as water, which is 11
+	if Debug {
+		log.Print("convert to int")
+	}
+	newlcBuffer := make([]int, lcbufferLen)
+	for i, v := range lcBuffer {
+		if v == byte(lcNodata) {
+			lcBuffer[i] = 11
+		}
+		newlcBuffer[i] = int(lcBuffer[i])
+	}
+
+	if Debug {
+		log.Print("lccoords")
+	}
+	lccoordslen := lcxlen * lcylen
+	lcCoords := make([][2]float64, lccoordslen)
+	for i := 0; i < lccoordslen; i++ {
+		lcCoords[i] = [2]float64{lcGT[0] + lcGT[1]*float64(lcxmin+i%lcxlen), lcGT[3] + lcGT[5]*float64(lcymin+i/lcxlen)}
+	}
+
+	// depth coords
+	if Debug {
+		log.Print("depth coords")
+	}
+	depthxlen := (lcExtents[xMax] - lcExtents[xMin]) / r.scale
+	depthylen := (lcExtents[yMax] - lcExtents[yMin]) / r.scale
+	depthLen := depthylen * depthxlen
+	depthCoords := make([][2]int, depthLen)
+	for i := 0; i < depthLen; i++ {
+		depthCoords[i] = [2]int{lcExtents[xMin] + r.scale*(i%depthxlen), lcExtents[yMax] - r.scale*(i/depthxlen)}
+	}
+
+	// IDT!
+	if Debug {
+		log.Print("run landcover IDT on depth array")
+	}
+	lcIDT, lcerr := idt.NewIDT(lcCoords, newlcBuffer)
+	if lcerr != nil {
+		panic(lcerr)
+	}
+	// was 11
+	deptharr, derr := lcIDT.Call(depthCoords, 1, true)
+	if derr != nil {
+		panic(derr)
+	}
+
+	depthhist := make(map[int16]int)
+	for _, b := range deptharr {
+		depthhist[b]++
+	}
+	for k, v := range depthhist {
+		log.Printf("depthhist[%d] = %d", int(k), v)
+	}
+
+	// because doing array math is too hard...
+	memdrv, memerr := gdal.GetDriverByName("MEM")
+	if memerr != nil {
+		panic(err)
+	}
+	tmpDS := memdrv.Create("tmp", depthxlen, depthylen, 1, gdal.Int16, nil)
+	lcgeotrans := [6]float64{float64(lcExtents[xMin]), float64(r.scale), 0, float64(lcExtents[yMax]), 0, float64(-1.0 * r.scale)}
+	proj := mapDS.Projection()
+
+	tmpDS.SetGeoTransform(lcgeotrans)
+	tmpDS.SetProjection(proj)
+	tmpBand := tmpDS.RasterBand(1)
+	tmperr := tmpBand.IO(gdal.Write, 0, 0, depthxlen, depthylen, deptharr, depthxlen, depthylen, 0, 0)
+	if notnil(tmperr) {
+		panic(tmperr)
+	}
+	resXsize := depthxlen - 2*r.maxdepth
+	resYsize := depthylen - 2*r.maxdepth
+	lcarr := make([]int16, resXsize*resYsize)
+	seconderr := tmpBand.IO(gdal.Read, r.maxdepth, r.maxdepth, resXsize, resYsize, lcarr, resXsize, resYsize, 0, 0)
+	if notnil(seconderr) {
+		panic(seconderr)
+	}
+
+	secondhist := make(map[int16]int)
+	for _, b := range lcarr {
+		secondhist[b]++
+	}
+	for k, v := range secondhist {
+		log.Printf("secondhist[%d] = %d", int(k), v)
+	}
+
+	if true {
+		if Debug {
+			log.Print("generate bathy array")
+		}
+		bathyBuffer := r.bathy(deptharr, depthxlen, depthylen, lcgeotrans, proj)
+
+		if Debug {
+			log.Print("writing bathy data")
+		}
+		bathyRaster := mapDS.RasterBand(Bathy)
+		bathyerr := bathyRaster.IO(gdal.Write, 0, 0, rXsize, rYsize, bathyBuffer, rXsize, rYsize, 0, 0)
+		if notnil(bathyerr) {
+			panic(bathyerr)
+		}
+
+	}
+	if Debug {
+		log.Print("writing lc data")
+	}
+	lcRaster := mapDS.RasterBand(Landcover)
+	lcrerr = lcRaster.IO(gdal.Write, 0, 0, rXsize, rYsize, lcarr, rXsize, rYsize, 0, 0)
+	if notnil(lcrerr) {
+		panic(lcrerr)
+	}
+}
+
+func (r Region) elev(orig []float32) []int16 {
+	elBuffer := make([]int16, len(orig))
+	for i, v := range orig {
+		elBuffer[i] = int16((int(v-float32(r.trim)) / r.vscale) + r.sealevel)
+	}
+	return elBuffer
 }
