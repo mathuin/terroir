@@ -1,22 +1,13 @@
 package carto
 
-import (
-	"testing"
-
-	"github.com/mathuin/gdal"
-)
+import "testing"
 
 // unit tests
 
 // more like integration tests
 
-var elFile = "/home/jmt/git/mathuin/TopoMC/downloads/elevation/imgn42w072_13.img"
+var elFile = "/home/jmt/git/lukeroth/TopoMC/downloads/elevation/imgn42w072_13.img"
 var lcFile = "/media/jmt/My Book/data/landcover/2011/nlcd_2011_landcover_2011_edition_2014_03_31.img"
-
-// Albers equal area centered over US
-var dstWKT = `PROJCS["USA_Contiguous_Albers_Equal_Area_Conic",GEOGCS["GCS_North_American_1983",DATUM["North_American_Datum_1983",SPHEROID["GRS_1980",6378137,298.257222101]],PRIMEM["Greenwich",0],UNIT["Degree",0.017453292519943295]],PROJECTION["Albers_Conic_Equal_Area"],PARAMETER["False_Easting",0],PARAMETER["False_Northing",0],PARAMETER["longitude_of_center",-96],PARAMETER["Standard_Parallel_1",29.5],PARAMETER["Standard_Parallel_2",45.5],PARAMETER["latitude_of_center",37.5],UNIT["Meter",1],AUTHORITY["EPSG","102003"]]`
-
-var resampleAlg = gdal.ResampleAlg(2)
 
 var xscale = 6
 var yscale = 6
@@ -66,8 +57,8 @@ var buildMap_tests = []struct {
 	lcvrt string
 }{
 	{
-		FloatExtents{-71.533, -71.62, 41.238, 41.142},
-		// FloatExtents{-71.575, -71.576, 41.189, 41.191},
+		// FloatExtents{-71.533, -71.62, 41.238, 41.142},
+		FloatExtents{-71.575, -71.576, 41.189, 41.191},
 		// "/media/jmt/My Book/data/elevation/13/elevation13.vrt",
 		"/home/jmt/git/mathuin/TopoMC/regions/BlockIsland/Datasets/elevation.vrt",
 		//"/media/jmt/My Book/data/landcover/2011/nlcd_2011_landcover_2011_edition_2014_03_31.img",
@@ -78,6 +69,7 @@ var buildMap_tests = []struct {
 func Test_buildMap(t *testing.T) {
 	for _, tt := range buildMap_tests {
 		r := MakeRegion("Pie", tt.ll)
+		r.tilesize = 16
 		r.vrts["elevation"] = tt.elvrt
 		r.vrts["landcover"] = tt.lcvrt
 		Debug = true
