@@ -5,7 +5,7 @@ import (
 	"log"
 	"math"
 
-	"github.com/lukeroth/gdal"
+	"github.com/mathuin/gdal"
 )
 
 // Extents are arrays of four values:
@@ -112,7 +112,7 @@ func getCorners(fromCS string, toCS string, in Extents) FloatExtents {
 	ymax := fe[2]
 	ymin := fe[3]
 
-	corners := []Float64Arr{{xmin, ymin}, {xmin, ymax}, {xmax, ymin}, {xmax, ymax}}
+	corners := [][]float64{{xmin, ymin}, {xmin, ymax}, {xmax, ymin}, {xmax, ymax}}
 	if Debug {
 		log.Print("  corners: ", corners)
 	}
