@@ -23,6 +23,8 @@ const (
 	Elevation
 	Bathy
 	Crust
+	Biome
+	NumLayers = iota - 1
 )
 
 var keys = []string{"elevation", "landcover"}
@@ -196,8 +198,9 @@ func (r Region) buildMap() {
 
 	// remove it if it already exists
 	remove(r.mapfile)
+	remove(fmt.Sprintf("%s.aux.xml", r.mapfile))
 
-	mapDS := driver.Create(r.mapfile, rXsize, rYsize, 4, gdal.Int16, nil)
+	mapDS := driver.Create(r.mapfile, rXsize, rYsize, NumLayers, gdal.Int16, nil)
 	defer mapDS.Close()
 
 	mapDS.SetGeoTransform(elGT)
@@ -211,17 +214,17 @@ func (r Region) buildMap() {
 	mapDS.SetProjection(mapWKT)
 
 	// transform the elevation array
-	newelBuffer := r.elev(elBuffer)
+	elevarr := r.elev(elBuffer)
 	elRaster := mapDS.RasterBand(Elevation)
-	eioerr := elRaster.IO(gdal.Write, 0, 0, rXsize, rYsize, newelBuffer, rXsize, rYsize, 0, 0)
+	eioerr := elRaster.IO(gdal.Write, 0, 0, rXsize, rYsize, elevarr, rXsize, rYsize, 0, 0)
 	if notnil(eioerr) {
 		panic(eioerr)
 	}
 
 	// write the crust array to the raster
-	crustBuffer := r.crust(rXsize, rYsize)
+	crustarr := r.crust(rXsize, rYsize)
 	crustRaster := mapDS.RasterBand(Crust)
-	crusterr := crustRaster.IO(gdal.Write, 0, 0, rXsize, rYsize, crustBuffer, rXsize, rYsize, 0, 0)
+	crusterr := crustRaster.IO(gdal.Write, 0, 0, rXsize, rYsize, crustarr, rXsize, rYsize, 0, 0)
 	if notnil(crusterr) {
 		panic(crusterr)
 	}
@@ -323,6 +326,14 @@ func (r Region) buildMap() {
 		panic(lcrerr)
 	}
 
+	// biomes
+	biomearr := r.biome(lcarr, elevarr, bathyarr)
+	biomeRaster := mapDS.RasterBand(Biome)
+	biomererr := biomeRaster.IO(gdal.Write, 0, 0, rXsize, rYsize, biomearr, rXsize, rYsize, 0, 0)
+	if notnil(biomererr) {
+		panic(biomererr)
+	}
+
 	if Debug {
 		datasetInfo(mapDS, "Output")
 	}
@@ -342,18 +353,9 @@ func datasetInfo(ds gdal.Dataset, name string) {
 	gt := ds.GeoTransform()
 	log.Printf("Origin: %f, %f", gt[0], gt[3])
 	log.Printf("Pixel size: %f, %f", gt[1], gt[5])
-	bandCount := ds.RasterCount()
-	log.Printf("Raster count: %d", bandCount)
-	for i := 0; i < bandCount; i++ {
-		rbi := i + 1
-		rb := ds.RasterBand(rbi)
-		rbn := rb.RasterDataType().Name()
-		rbmin, minok := rb.GetMinimum()
-		rbmax, maxok := rb.GetMaximum()
-		if !minok || !maxok {
-			rbmin, rbmax = rb.ComputeMinMax(0)
-		}
-		log.Printf("  %d: %s (%f, %f)", rbi, rbn, rbmin, rbmax)
+	minmaxes := datasetMinMaxes(ds)
+	for i, v := range minmaxes {
+		log.Printf("%d: %s", i+1, v)
 	}
 }
 
@@ -365,4 +367,31 @@ func regionInfo(gt [6]float64, extents Extents) {
 	xSize := (e[xMax] - e[xMin]) / gt[1]
 	ySize := (e[yMin] - e[yMax]) / gt[5]
 	log.Printf("Size: %f, %f", xSize, ySize)
+}
+
+type RasterInfo struct {
+	datatype string
+	min      float64
+	max      float64
+}
+
+func (ri RasterInfo) String() string {
+	return fmt.Sprintf("%s (%f, %f)", ri.datatype, ri.min, ri.max)
+}
+
+func datasetMinMaxes(ds gdal.Dataset) []RasterInfo {
+	bandCount := ds.RasterCount()
+	retval := make([]RasterInfo, bandCount)
+	for i := 0; i < bandCount; i++ {
+		rbi := i + 1
+		rb := ds.RasterBand(rbi)
+		rbdt := rb.RasterDataType().Name()
+		rbmin, minok := rb.GetMinimum()
+		rbmax, maxok := rb.GetMaximum()
+		if !minok || !maxok {
+			rbmin, rbmax = rb.ComputeMinMax(0)
+		}
+		retval[i] = RasterInfo{datatype: rbdt, min: rbmin, max: rbmax}
+	}
+	return retval
 }
