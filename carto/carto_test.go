@@ -1,68 +1,22 @@
 package carto
 
-import "testing"
+import (
+	"testing"
 
-// unit tests
-
-// more like integration tests
-
-var elFile = "/home/jmt/git/lukeroth/TopoMC/downloads/elevation/imgn42w072_13.img"
-var lcFile = "/media/jmt/My Book/data/landcover/2011/nlcd_2011_landcover_2011_edition_2014_03_31.img"
-
-var xscale = 6
-var yscale = 6
-
-var srcNodata = float32(-340282346638529993179660072199368212480.0)
-
-var dstNodata = 0
-
-var llextents = FloatExtents{-71.533, -71.62, 41.238, 41.142}
-
-var albersExtents = map[string]IntExtents{
-	"elevation": {2015232, 2002944, 2291712, 2273280},
-	"landcover": {2015412, 2002764, 2291892, 2273100},
-}
-
-var wgs84Extents = map[string]FloatExtents{
-	"elevation": {-71.48245416519951, -71.68161580988412, 41.30762685177235, 41.12049902574309},
-	"landcover": {-71.47980755995131, -71.68425418133639, 41.309590101757536, 41.11853504487958},
-}
-
-var maybemaketiffs_tests = []struct {
-	ll     FloatExtents
-	elvrt  string
-	elfile string
-	lcfile string
-}{
-	{
-		// FloatExtents{-71.533, -71.62, 41.238, 41.142},
-		FloatExtents{-71.575, -71.576, 41.189, 41.191},
-		"/media/jmt/My Book/data/elevation/13/elevation13.vrt",
-		"elevation.tif",
-		"/media/jmt/My Book/data/landcover/2011/nlcd_2011_landcover_2011_edition_2014_03_31.img",
-	},
-}
-
-func NOTest_maybemaketiffs(t *testing.T) {
-	for _, tt := range maybemaketiffs_tests {
-		r := MakeRegion("Pie", tt.ll)
-		r.vrts["elevation"] = tt.elvrt
-		// r.maybemaketiffs()
-	}
-}
+	"github.com/lukeroth/gdal"
+)
 
 var buildMap_tests = []struct {
-	ll    FloatExtents
-	elvrt string
-	lcvrt string
+	ll      FloatExtents
+	elvrt   string
+	lcvrt   string
+	rasters [][]float64
 }{
 	{
-		// FloatExtents{-71.533, -71.62, 41.238, 41.142},
 		FloatExtents{-71.575, -71.576, 41.189, 41.191},
-		// "/media/jmt/My Book/data/elevation/13/elevation13.vrt",
-		"/home/jmt/git/mathuin/TopoMC/regions/BlockIsland/Datasets/elevation.vrt",
-		//"/media/jmt/My Book/data/landcover/2011/nlcd_2011_landcover_2011_edition_2014_03_31.img",
-		"/home/jmt/git/mathuin/TopoMC/regions/BlockIsland/Datasets/landcover.vrt",
+		"test_elevation.tif",
+		"test_landcover.tif",
+		[][]float64{[]float64{11, 95}, []float64{62, 64}, []float64{0, 30}, []float64{1, 4}},
 	},
 }
 
@@ -75,5 +29,25 @@ func Test_buildMap(t *testing.T) {
 		Debug = true
 		r.buildMap()
 		Debug = false
+
+		// check the raster minmaxes
+		ds, err := gdal.Open(r.mapfile, gdal.ReadOnly)
+		if err != nil {
+			t.Fail()
+		}
+		bandCount := ds.RasterCount()
+		for i := 0; i < bandCount; i++ {
+			rbi := i + 1
+			rb := ds.RasterBand(rbi)
+			rbmin, minok := rb.GetMinimum()
+			rbmax, maxok := rb.GetMaximum()
+			if !minok || !maxok {
+				rbmin, rbmax = rb.ComputeMinMax(0)
+			}
+			if rbmin != tt.rasters[i][0] || rbmax != tt.rasters[i][1] {
+				t.Errorf("raster %d: expected (%f, %f) got (%f, %f)", rbi, tt.rasters[i][0], tt.rasters[i][1], rbmin, rbmax)
+			}
+		}
+
 	}
 }
