@@ -101,9 +101,9 @@ func (r Region) buildMap() {
 	warpcmd := exec.Command(path, `-q`, `-multi`, `-t_srs`, albers_proj, `-tr`, fmt.Sprintf("%d", r.scale), fmt.Sprintf("%d", r.scale), `-te`, fmt.Sprintf("%d", elExtents[xMin]), fmt.Sprintf("%d", elExtents[yMin]), fmt.Sprintf("%d", elExtents[xMax]), fmt.Sprintf("%d", elExtents[yMax]), `-r`, `cubic`, `-srcnodata`, `"-340282346638529993179660072199368212480.000"`, `-dstnodata`, `0`, fmt.Sprintf(`%s`, r.vrts["elevation"]), fmt.Sprintf(`%s`, elfile))
 
 	// run the command
-	out, nerr := warpcmd.Output()
+	out, nerr := warpcmd.CombinedOutput()
 	if notnil(nerr) {
-		log.Panic(out)
+		log.Print(string(out))
 		panic(nerr)
 	}
 	_ = out
@@ -114,34 +114,20 @@ func (r Region) buildMap() {
 		panic(err)
 	}
 	defer elDS.Close()
+	if Debug {
+		datasetInfo(elDS, "Elevation")
+	}
 	rXsize := elDS.RasterXSize()
 	rYsize := elDS.RasterYSize()
-	if Debug {
-		log.Printf("Dataset size: %d, %d", rXsize, rYsize)
-	}
 
 	// get transform
 	elGT := elDS.GeoTransform()
 	if Debug {
-		log.Printf("Origin: %f, %f", elGT[0], elGT[3])
-		log.Printf("Pixel Size: %f, %f", elGT[1], elGT[5])
-	}
-	if Debug {
-		xOff := (float64(elExtents[xMin]) - elGT[0]) / elGT[1]
-		yOff := (float64(elExtents[yMax]) - elGT[3]) / elGT[5]
-		log.Printf("Offset: %f, %f", xOff, yOff)
-	}
-	if Debug {
-		xSize := float64(elExtents[xMax]-elExtents[xMin]) / elGT[1]
-		ySize := float64(elExtents[yMin]-elExtents[yMax]) / elGT[5]
-		log.Printf("Size: %f, %f", xSize, ySize)
+		regionInfo(elGT, elExtents)
 	}
 
 	// get band
 	elBand := elDS.RasterBand(1)
-	if Debug {
-		log.Print("EL Band type: ", elBand.RasterDataType().Name())
-	}
 
 	// get array
 	bufferLen := rXsize * rYsize
@@ -150,7 +136,6 @@ func (r Region) buildMap() {
 	if notnil(elrerr) {
 		panic(elrerr)
 	}
-	// get sizes
 
 	// get elmin and elmax
 	elMin, minok := elBand.GetMinimum()
@@ -159,10 +144,7 @@ func (r Region) buildMap() {
 	if !minok || !maxok {
 		elMin, elMax = elBand.ComputeMinMax(0)
 	}
-	if Debug {
-		log.Print("Min = ", elMin)
-		log.Print("Max = ", elMax)
-	}
+
 	// close elband
 	// close elds
 	// (covered by defers)
@@ -207,9 +189,6 @@ func (r Region) buildMap() {
 	}
 
 	// build a four-layer GeoTIFF
-	if Debug {
-		log.Print("build four-layer GeoTIFF")
-	}
 	driver, derr := gdal.GetDriverByName("GTiff")
 	if derr != nil {
 		panic(err)
@@ -232,9 +211,6 @@ func (r Region) buildMap() {
 	mapDS.SetProjection(mapWKT)
 
 	// transform the elevation array
-	if Debug {
-		log.Print("transform the elevation array")
-	}
 	newelBuffer := r.elev(elBuffer)
 	elRaster := mapDS.RasterBand(Elevation)
 	eioerr := elRaster.IO(gdal.Write, 0, 0, rXsize, rYsize, newelBuffer, rXsize, rYsize, 0, 0)
@@ -243,9 +219,6 @@ func (r Region) buildMap() {
 	}
 
 	// write the crust array to the raster
-	if Debug {
-		log.Print("generate crust array")
-	}
 	crustBuffer := r.crust(rXsize, rYsize)
 	crustRaster := mapDS.RasterBand(Crust)
 	crusterr := crustRaster.IO(gdal.Write, 0, 0, rXsize, rYsize, crustBuffer, rXsize, rYsize, 0, 0)
@@ -254,9 +227,6 @@ func (r Region) buildMap() {
 	}
 
 	// landcover and depth follow
-	if Debug {
-		log.Print("retrieve landcover data")
-	}
 	lcExtents := r.albers["landcover"]
 
 	lcDS, err := gdal.Open(r.vrts["landcover"], gdal.ReadOnly)
@@ -265,47 +235,24 @@ func (r Region) buildMap() {
 	}
 	defer lcDS.Close()
 	if Debug {
-		lcrXsize := lcDS.RasterXSize()
-		lcrYsize := lcDS.RasterYSize()
-		log.Printf("Dataset size: %d, %d", lcrXsize, lcrYsize)
+		datasetInfo(lcDS, "Landcover")
 	}
 
 	// get transform
 	lcGT := lcDS.GeoTransform()
-	lcxmin := int((float64(lcExtents[xMin]) - lcGT[0]) / lcGT[1])
-	lcxmax := int((float64(lcExtents[xMax]) - lcGT[0]) / lcGT[1])
-	lcymin := int((float64(lcExtents[yMax]) - lcGT[3]) / lcGT[5])
-	lcymax := int((float64(lcExtents[yMin]) - lcGT[3]) / lcGT[5])
+	lcf := lcExtents.floats()
+	lcxmin := int((lcf[xMin] - lcGT[0]) / lcGT[1])
+	lcxmax := int((lcf[xMax] - lcGT[0]) / lcGT[1])
+	lcymin := int((lcf[yMax] - lcGT[3]) / lcGT[5])
+	lcymax := int((lcf[yMin] - lcGT[3]) / lcGT[5])
 	lcxlen := lcxmax - lcxmin
 	lcylen := lcymax - lcymin
 	if Debug {
-		log.Printf("Origin: %f, %f", lcGT[0], lcGT[3])
-		log.Printf("Pixel Size: %f, %f", lcGT[1], lcGT[5])
-	}
-	if Debug {
-		lcxOff := (float64(lcExtents[xMin]) - lcGT[0]) / lcGT[1]
-		lcyOff := (float64(lcExtents[yMax]) - lcGT[3]) / lcGT[5]
-		log.Printf("Offset: %f, %f", lcxOff, lcyOff)
-	}
-	if Debug {
-		lcxSize := float64(lcExtents[xMax]-lcExtents[xMin]) / lcGT[1]
-		lcySize := float64(lcExtents[yMin]-lcExtents[yMax]) / lcGT[5]
-		log.Printf("Size: %f, %f", lcxSize, lcySize)
-	}
-
-	// get band
-	if Debug {
-		log.Print("Get landcover band")
-	}
-	lcBand := lcDS.RasterBand(1)
-	if Debug {
-		log.Print("LC Band type: ", lcBand.RasterDataType().Name())
+		regionInfo(lcGT, lcExtents)
 	}
 
 	// get array
-	if Debug {
-		log.Print("Get landcover array")
-	}
+	lcBand := lcDS.RasterBand(1)
 	lcbufferLen := lcxlen * lcylen
 	lcBuffer := make([]byte, lcbufferLen)
 	lcrerr := lcBand.IO(gdal.Read, lcxmin, lcymin, lcxlen, lcylen, lcBuffer, lcxlen, lcylen, 0, 0)
@@ -313,17 +260,11 @@ func (r Region) buildMap() {
 		panic(lcrerr)
 	}
 
-	if Debug {
-		log.Print("Get landcover nodata")
-	}
 	lcNodata, ok := lcBand.NoDataValue()
 	if !ok {
 		lcNodata = 0
 	}
 	// nodata is treated as water, which is 11
-	if Debug {
-		log.Print("convert to int")
-	}
 	newlcBuffer := make([]int, lcbufferLen)
 	for i, v := range lcBuffer {
 		if v == byte(lcNodata) {
@@ -332,9 +273,6 @@ func (r Region) buildMap() {
 		newlcBuffer[i] = int(lcBuffer[i])
 	}
 
-	if Debug {
-		log.Print("lccoords")
-	}
 	lccoordslen := lcxlen * lcylen
 	lcCoords := make([][2]float64, lccoordslen)
 	for i := 0; i < lccoordslen; i++ {
@@ -342,9 +280,6 @@ func (r Region) buildMap() {
 	}
 
 	// depth coords
-	if Debug {
-		log.Print("depth coords")
-	}
 	depthxlen := (lcExtents[xMax] - lcExtents[xMin]) / r.scale
 	depthylen := (lcExtents[yMax] - lcExtents[yMin]) / r.scale
 	depthLen := depthylen * depthxlen
@@ -354,9 +289,6 @@ func (r Region) buildMap() {
 	}
 
 	// IDT!
-	if Debug {
-		log.Print("run landcover IDT on depth array")
-	}
 	lcIDT, lcerr := idt.NewIDT(lcCoords, newlcBuffer)
 	if lcerr != nil {
 		panic(lcerr)
@@ -367,9 +299,6 @@ func (r Region) buildMap() {
 		panic(derr)
 	}
 
-	if Debug {
-		log.Print("generate bathy array")
-	}
 	bathyBuffer := r.bathy(deptharr, depthxlen, depthylen)
 
 	lcarr := []int16{}
@@ -382,22 +311,20 @@ func (r Region) buildMap() {
 		}
 	}
 
-	if Debug {
-		log.Print("writing bathy data")
-	}
 	bathyRaster := mapDS.RasterBand(Bathy)
 	bathyerr := bathyRaster.IO(gdal.Write, 0, 0, rXsize, rYsize, bathyarr, rXsize, rYsize, 0, 0)
 	if notnil(bathyerr) {
 		panic(bathyerr)
 	}
 
-	if Debug {
-		log.Print("writing lc data")
-	}
 	lcRaster := mapDS.RasterBand(Landcover)
 	lcrerr = lcRaster.IO(gdal.Write, 0, 0, rXsize, rYsize, lcarr, rXsize, rYsize, 0, 0)
 	if notnil(lcrerr) {
 		panic(lcrerr)
+	}
+
+	if Debug {
+		datasetInfo(mapDS, "Output")
 	}
 }
 
@@ -407,4 +334,35 @@ func (r Region) elev(orig []float32) []int16 {
 		elBuffer[i] = int16((int(v-float32(r.trim)) / r.vscale) + r.sealevel)
 	}
 	return elBuffer
+}
+
+func datasetInfo(ds gdal.Dataset, name string) {
+	log.Printf("%s dataset", name)
+	log.Printf("Dataset size: %d, %d", ds.RasterXSize(), ds.RasterYSize())
+	gt := ds.GeoTransform()
+	log.Printf("Origin: %f, %f", gt[0], gt[3])
+	log.Printf("Pixel size: %f, %f", gt[1], gt[5])
+	bandCount := ds.RasterCount()
+	log.Printf("Raster count: %d", bandCount)
+	for i := 0; i < bandCount; i++ {
+		rbi := i + 1
+		rb := ds.RasterBand(rbi)
+		rbn := rb.RasterDataType().Name()
+		rbmin, minok := rb.GetMinimum()
+		rbmax, maxok := rb.GetMaximum()
+		if !minok || !maxok {
+			rbmin, rbmax = rb.ComputeMinMax(0)
+		}
+		log.Printf("  %d: %s (%f, %f)", rbi, rbn, rbmin, rbmax)
+	}
+}
+
+func regionInfo(gt [6]float64, extents Extents) {
+	e := extents.floats()
+	xOff := (e[xMin] - gt[0]) / gt[1]
+	yOff := (e[yMax] - gt[3]) / gt[5]
+	log.Printf("Offset: %f, %f", xOff, yOff)
+	xSize := (e[xMax] - e[xMin]) / gt[1]
+	ySize := (e[yMin] - e[yMax]) / gt[5]
+	log.Printf("Size: %f, %f", xSize, ySize)
 }
