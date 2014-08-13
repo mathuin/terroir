@@ -2,12 +2,14 @@ package carto
 
 import (
 	"fmt"
+	"io/ioutil"
 	"log"
 	"math"
+	"os"
 	"os/exec"
 	"path"
 
-	"github.com/lukeroth/gdal"
+	"github.com/mathuin/gdal"
 	"github.com/mathuin/terroir/idt"
 )
 
@@ -49,12 +51,9 @@ type Region struct {
 	trim     int
 	sealevel int
 	maxdepth int
-
-	albers map[string]IntExtents
-	wgs84  map[string]FloatExtents
-
-	vrts  map[string]string
-	files map[string]string
+	albers   map[string]IntExtents
+	wgs84    map[string]FloatExtents
+	vrts     map[string]string
 
 	mapfile string
 }
@@ -68,12 +67,10 @@ func MakeRegion(name string, ll FloatExtents) Region {
 	sealevel := 62
 	maxdepth := 30
 	vrts := map[string]string{}
-	files := map[string]string{}
 	albers := map[string]IntExtents{}
 	wgs84 := map[string]FloatExtents{}
 	for _, key := range keys {
 		vrts[key] = ""
-		files[key] = ""
 		albers[key] = IntExtents{}
 		wgs84[key] = FloatExtents{}
 	}
@@ -81,153 +78,19 @@ func MakeRegion(name string, ll FloatExtents) Region {
 	// this will be stored there too.
 	mapfile := "/tmp/map.tif"
 
-	r := Region{name: name, ll: ll, tilesize: tilesize, scale: scale, vscale: vscale, trim: trim, sealevel: sealevel, maxdepth: maxdepth, vrts: vrts, files: files, albers: albers, wgs84: wgs84, mapfile: mapfile}
+	r := Region{name: name, ll: ll, tilesize: tilesize, scale: scale, vscale: vscale, trim: trim, sealevel: sealevel, maxdepth: maxdepth, vrts: vrts, albers: albers, wgs84: wgs84, mapfile: mapfile}
 	r.generateExtents()
 	return r
 }
 
-// JMT: exists as a potential example to convert things to warp API
-func (r Region) maybemaketiffs() {
-	// hardcoded inputs:
-	// - elevation IMG
-	// - Block Island region (hardcoded extents)
-
-	// outputs:
-	// - an appropriately scaled array
-
-	// to warp, we need:
-	// - source WKT (check!)
-	// - destination WKT (check!)
-	// - resample algorithm (check!)
-	// - input dataset (check!)
-	// - output dataset
-
-	// td, nerr := ioutil.TempDir("", "")
-	// if nerr != nil {
-	// 	panic(nerr)
-	// }
-	// defer os.RemoveAll(td)
-	td := "."
-	tf := path.Join(td, "test.tif")
-
-	albers := albersExtents["elevation"]
-	// wgs84 := wgs84Extents["elevation"]
-	txrawSize := (albers[xMax] - albers[xMin])
-	tyrawSize := (albers[yMax] - albers[yMin])
-	txarrSize := txrawSize / xscale
-	tyarrSize := tyrawSize / yscale
-
-	elDS, err := gdal.Open(elFile, gdal.ReadOnly)
-	if err != nil {
-		panic(err)
-	}
-	defer elDS.Close()
-
-	elProj := elDS.Projection()
-
-	vDS, err := elDS.AutoCreateWarpedVRT(elProj, dstWKT, resampleAlg)
-	if err != nil {
-		panic(err)
-	}
-	defer vDS.Close()
-	if Debug {
-		log.Print(vDS.Projection())
-	}
-	rXsize := vDS.RasterXSize()
-	rYsize := vDS.RasterYSize()
-	if Debug {
-		log.Printf("Dataset size: %d, %d", rXsize, rYsize)
-	}
-
-	vGeoTransform := vDS.GeoTransform()
-	if Debug {
-		log.Printf("Albers x range %d - %d, y range %d - %d", albers[xMin], albers[xMax], albers[yMin], albers[yMax])
-		log.Printf("Albers size %d, %d", txrawSize, tyrawSize)
-		log.Printf("xscale %d, yscale %d", xscale, yscale)
-		log.Printf("Array size %d, %d", txrawSize/xscale, tyrawSize/yscale)
-		log.Printf("Origin: %f, %f", vGeoTransform[0], vGeoTransform[3])
-		log.Printf("Pixel size: %f, %f", vGeoTransform[1], vGeoTransform[5])
-		log.Printf("Final: %f, %f", vGeoTransform[0]+vGeoTransform[1]*float64(rXsize), vGeoTransform[3]+vGeoTransform[5]*float64(rYsize))
-	}
-	xOff := int((float64(albers[xMin]) - vGeoTransform[0]) / vGeoTransform[1])
-	yOff := int((float64(albers[xMax]) - vGeoTransform[3]) / vGeoTransform[5])
-	xSize := int((float64(txrawSize)) / vGeoTransform[1])
-	ySize := int((float64(tyrawSize)) / vGeoTransform[5])
-	if Debug {
-		log.Printf("Offset: %d, %d", xOff, yOff)
-		log.Printf("Size: %d, %d", xSize, ySize)
-	}
-	vBand := vDS.RasterBand(1)
-	if Debug {
-		log.Print("Band type: ", vBand.RasterDataType().Name())
-	}
-	vMax, maxerr := vBand.GetMaximum()
-	if maxerr {
-		if Debug {
-			log.Print("Max: ", vMax)
-		}
-	}
-	vMin, minerr := vBand.GetMinimum()
-	if minerr {
-		if Debug {
-			log.Print("Min: ", vMin)
-		}
-	}
-	vNDV, ok := vBand.NoDataValue()
-	if ok {
-		if Debug {
-			log.Print("Nodata value: ", vNDV)
-		}
-	}
-	if Debug {
-		log.Print("before first IO")
-	}
-	vBuffer := make([]float32, rXsize*rYsize)
-	ioerr := vBand.IO(gdal.Read, 0, 0, rXsize, rYsize, vBuffer, rXsize, rYsize, 0, 0)
-	if notnil(ioerr) {
-		panic(ioerr)
-	}
-	if Debug {
-		log.Print("after first IO")
-	}
-
-	for i, val := range vBuffer {
-		if val == srcNodata {
-			vBuffer[i] = 0
-		}
-	}
-
-	for i, val := range vBuffer {
-		if val != 0 {
-			if Debug {
-				log.Printf("vBuffer[%d] = %f", i, val)
-			}
-			break
-		}
-	}
-
-	tDriver, err := gdal.GetDriverByName("GTiff")
-	if err != nil {
-		panic(err)
-	}
-
-	tDS := tDriver.Create(tf, txarrSize, tyarrSize, 1, gdal.Float32, nil)
-	defer tDS.Close()
-
-	tDS.SetGeoTransform(vGeoTransform)
-
-	if Debug {
-		log.Print("before second IO")
-	}
-	tBand := tDS.RasterBand(1)
-	tBand.IO(gdal.Write, 0, 0, txarrSize, tyarrSize, vBuffer, txarrSize, tyarrSize, 0, 0)
-	if Debug {
-		log.Print("after second IO")
-	}
-
-}
-
 func (r Region) buildMap() {
+	td, nerr := ioutil.TempDir("", "")
+	if nerr != nil {
+		panic(nerr)
+	}
+	defer os.RemoveAll(td)
+	elfile := path.Join(td, "elevation.tif")
+
 	elExtents := r.albers["elevation"]
 
 	path, err := exec.LookPath("gdalwarp")
@@ -235,10 +98,7 @@ func (r Region) buildMap() {
 		panic(err)
 	}
 
-	warpcmd := exec.Command(path, `-q`, `-multi`, `-t_srs`, albers_proj, `-tr`, fmt.Sprintf("%d", r.scale), fmt.Sprintf("%d", r.scale), `-te`, fmt.Sprintf("%d", elExtents[xMin]), fmt.Sprintf("%d", elExtents[yMin]), fmt.Sprintf("%d", elExtents[xMax]), fmt.Sprintf("%d", elExtents[yMax]), `-r`, `cubic`, `-srcnodata`, `"-340282346638529993179660072199368212480.000"`, `-dstnodata`, `0`, fmt.Sprintf(`%s`, r.vrts["elevation"]), fmt.Sprintf(`%s`, r.files["elevation"]))
-
-	// remove elevation file if necessary
-	remove(r.files["elevation"])
+	warpcmd := exec.Command(path, `-q`, `-multi`, `-t_srs`, albers_proj, `-tr`, fmt.Sprintf("%d", r.scale), fmt.Sprintf("%d", r.scale), `-te`, fmt.Sprintf("%d", elExtents[xMin]), fmt.Sprintf("%d", elExtents[yMin]), fmt.Sprintf("%d", elExtents[xMax]), fmt.Sprintf("%d", elExtents[yMax]), `-r`, `cubic`, `-srcnodata`, `"-340282346638529993179660072199368212480.000"`, `-dstnodata`, `0`, fmt.Sprintf(`%s`, r.vrts["elevation"]), fmt.Sprintf(`%s`, elfile))
 
 	// run the command
 	out, nerr := warpcmd.Output()
@@ -249,7 +109,7 @@ func (r Region) buildMap() {
 	_ = out
 
 	// open elds
-	elDS, err := gdal.Open(r.files["elevation"], gdal.ReadOnly)
+	elDS, err := gdal.Open(elfile, gdal.ReadOnly)
 	if err != nil {
 		panic(err)
 	}
@@ -399,7 +259,7 @@ func (r Region) buildMap() {
 	}
 	lcExtents := r.albers["landcover"]
 
-	lcDS, err := gdal.Open(r.files["landcover"], gdal.ReadOnly)
+	lcDS, err := gdal.Open(r.vrts["landcover"], gdal.ReadOnly)
 	if err != nil {
 		panic(err)
 	}
@@ -453,14 +313,6 @@ func (r Region) buildMap() {
 		panic(lcrerr)
 	}
 
-	lchist := make(map[byte]int)
-	for _, b := range lcBuffer {
-		lchist[b]++
-	}
-	for k, v := range lchist {
-		log.Printf("lchist[%d] = %d", int(k), v)
-	}
-
 	if Debug {
 		log.Print("Get landcover nodata")
 	}
@@ -509,68 +361,36 @@ func (r Region) buildMap() {
 	if lcerr != nil {
 		panic(lcerr)
 	}
-	// was 11
+
 	deptharr, derr := lcIDT.Call(depthCoords, 1, true)
 	if derr != nil {
 		panic(derr)
 	}
 
-	depthhist := make(map[int16]int)
-	for _, b := range deptharr {
-		depthhist[b]++
+	if Debug {
+		log.Print("generate bathy array")
 	}
-	for k, v := range depthhist {
-		log.Printf("depthhist[%d] = %d", int(k), v)
-	}
+	bathyBuffer := r.bathy(deptharr, depthxlen, depthylen)
 
-	// because doing array math is too hard...
-	memdrv, memerr := gdal.GetDriverByName("MEM")
-	if memerr != nil {
-		panic(err)
-	}
-	tmpDS := memdrv.Create("tmp", depthxlen, depthylen, 1, gdal.Int16, nil)
-	lcgeotrans := [6]float64{float64(lcExtents[xMin]), float64(r.scale), 0, float64(lcExtents[yMax]), 0, float64(-1.0 * r.scale)}
-	proj := mapDS.Projection()
-
-	tmpDS.SetGeoTransform(lcgeotrans)
-	tmpDS.SetProjection(proj)
-	tmpBand := tmpDS.RasterBand(1)
-	tmperr := tmpBand.IO(gdal.Write, 0, 0, depthxlen, depthylen, deptharr, depthxlen, depthylen, 0, 0)
-	if notnil(tmperr) {
-		panic(tmperr)
-	}
-	resXsize := depthxlen - 2*r.maxdepth
-	resYsize := depthylen - 2*r.maxdepth
-	lcarr := make([]int16, resXsize*resYsize)
-	seconderr := tmpBand.IO(gdal.Read, r.maxdepth, r.maxdepth, resXsize, resYsize, lcarr, resXsize, resYsize, 0, 0)
-	if notnil(seconderr) {
-		panic(seconderr)
-	}
-
-	secondhist := make(map[int16]int)
-	for _, b := range lcarr {
-		secondhist[b]++
-	}
-	for k, v := range secondhist {
-		log.Printf("secondhist[%d] = %d", int(k), v)
-	}
-
-	if true {
-		if Debug {
-			log.Print("generate bathy array")
+	lcarr := []int16{}
+	bathyarr := []int16{}
+	for i := 0; i < depthLen; i++ {
+		if i%depthxlen >= r.maxdepth && i%depthxlen < depthxlen-r.maxdepth &&
+			i/depthxlen >= r.maxdepth && i/depthxlen < depthylen-r.maxdepth {
+			lcarr = append(lcarr, deptharr[i])
+			bathyarr = append(bathyarr, bathyBuffer[i])
 		}
-		bathyBuffer := r.bathy(deptharr, depthxlen, depthylen, lcgeotrans, proj)
-
-		if Debug {
-			log.Print("writing bathy data")
-		}
-		bathyRaster := mapDS.RasterBand(Bathy)
-		bathyerr := bathyRaster.IO(gdal.Write, 0, 0, rXsize, rYsize, bathyBuffer, rXsize, rYsize, 0, 0)
-		if notnil(bathyerr) {
-			panic(bathyerr)
-		}
-
 	}
+
+	if Debug {
+		log.Print("writing bathy data")
+	}
+	bathyRaster := mapDS.RasterBand(Bathy)
+	bathyerr := bathyRaster.IO(gdal.Write, 0, 0, rXsize, rYsize, bathyarr, rXsize, rYsize, 0, 0)
+	if notnil(bathyerr) {
+		panic(bathyerr)
+	}
+
 	if Debug {
 		log.Print("writing lc data")
 	}
