@@ -2,7 +2,6 @@ package carto
 
 import (
 	"fmt"
-	"log"
 	"strings"
 
 	"github.com/mathuin/gdal"
@@ -31,11 +30,9 @@ func (r Region) bathy(inarr []int16, inx int, iny int) []int16 {
 
 	// someday water may not be so simple
 	not11 := nomatch(inarr, []int16{11})
-	log.Print("not11: ", not11)
 
 	// configure options
-	maxdepth := 2
-	options := []string{fmt.Sprintf("MAXDIST=%d", maxdepth), fmt.Sprintf("NODATA=%d", maxdepth), fmt.Sprintf("VALUES=%s", strings.Join(not11, ","))}
+	options := []string{fmt.Sprintf("MAXDIST=%d", r.maxdepth), fmt.Sprintf("NODATA=%d", r.maxdepth), fmt.Sprintf("VALUES=%s", strings.Join(not11, ","))}
 
 	// run computeproximity
 	err3 := srcBand.ComputeProximity(destBand, options, gdal.ScaledProgress, nil)

@@ -6,10 +6,11 @@ import (
 )
 
 var bathy_tests = []struct {
-	inarr  []int16
-	inx    int
-	iny    int
-	outarr []int16
+	inarr    []int16
+	inx      int
+	iny      int
+	maxdepth int
+	outarr   []int16
 }{
 	{
 		[]int16{
@@ -21,7 +22,7 @@ var bathy_tests = []struct {
 			11, 11, 11, 11, 11,
 			11, 11, 11, 11, 11,
 		},
-		5, 7,
+		5, 7, 2,
 		[]int16{
 			2, 2, 2, 2, 2,
 			2, 2, 2, 2, 2,
@@ -36,6 +37,7 @@ var bathy_tests = []struct {
 func Test_bathy(t *testing.T) {
 	for _, tt := range bathy_tests {
 		r := MakeRegion("Pie", FloatExtents{-71.575, -71.576, 41.189, 41.191})
+		r.maxdepth = tt.maxdepth
 		outarr := r.bathy(tt.inarr, tt.inx, tt.iny)
 
 		for i, v := range outarr {
