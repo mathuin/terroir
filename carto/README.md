@@ -1,12 +1,12 @@
 # Map notes
 
-## Get elevation and landcover data into arrays
+## Get elevation and landcover data into arrays (DONE)
 
 For now, use the VRTs from the giant download of all that data for
 production.  Once it's working, extract very very small chunks of both
 datasets and save them in the repository along with a test routine.
 
-## Build a biome map from that data
+## Build a biome map from that data (DONE)
 
 The initial map will be oceans/plains.  If landcover says it's water,
 biome says it's ocean.  More sophisticated once everything's working.

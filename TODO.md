@@ -10,13 +10,13 @@ Development task list
   - [x] Write level.dat and test
   - [x] Random access to blocks and data in world
   - [x] Double-check test coverage!
-- [ ] Write map generation package including biome map
-  - [ ] Import landcover data into map
-  - [ ] Generate crust array
-  - [ ] Biome map: ocean/plains!
-  - [ ] Generate bathy array
-  - [ ] Biome map: deep ocean
-  - [ ] Import elevation data into map
+- [x] Write map generation package including biome map
+  - [x] Import landcover data into map
+  - [x] Generate crust array
+  - [x] Biome map: ocean/plains!
+  - [x] Generate bathy array
+  - [x] Biome map: deep ocean
+  - [x] Import elevation data into map
   - [ ] Biome map: Hills and Extreme hills
 - [ ] Translate biome and other maps into Minecraft world
   - [ ] One goroutine per chunk?  column?  region?  world?
