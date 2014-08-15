@@ -17,7 +17,7 @@ Development task list
   - [x] Generate bathy array
   - [x] Biome map: deep ocean
   - [x] Import elevation data into map
-  - [ ] Biome map: Hills and Extreme hills
+  - [x] Biome map: Hills and Extreme hills
 - [ ] Translate biome and other maps into Minecraft world
   - [ ] One goroutine per chunk?  column?  region?  world?
 - [ ] Build Docker container for project
@@ -26,8 +26,8 @@ Development task list
 Future
 ------
 - [ ] Additional biome map features
-  - [ ] Forests
-  - [ ] Deserts
+  - [x] Forests
+  - [x] Deserts
   - [ ] Buildings on developed lands
   - [ ] Croplands
   - [ ] Beaches
