@@ -11,9 +11,8 @@ func (r *Region) biome(lcarr []int16, elevarr []int16, bathyarr []int16) (biomea
 	biomearr = make([]int16, bufferLen)
 	for i := 0; i < bufferLen; i++ {
 		lc := lcarr[i]
-		// elev := elevarr[i]
+		elev := elevarr[i]
 		bathy := bathyarr[i]
-
 		var biome string
 		switch lc {
 		case 11:
@@ -23,7 +22,13 @@ func (r *Region) biome(lcarr []int16, elevarr []int16, bathyarr []int16) (biomea
 				biome = "Ocean"
 			}
 		default:
-			biome = "Plains"
+			if elev > 122 {
+				biome = "Extreme Hills"
+			} else if elev > 92 {
+				biome = "Extreme Hills Edge"
+			} else {
+				biome = "Plains"
+			}
 		}
 		val, ok := world.Biome[biome]
 		if !ok {
