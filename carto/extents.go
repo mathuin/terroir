@@ -96,9 +96,9 @@ func (r Region) generateExtents() {
 func getCorners(fromCS string, toCS string, in Extents) FloatExtents {
 	if Debug {
 		log.Print("getCorners: ")
-		log.Print(" fromCS: ", fromCS)
-		log.Print(" toCS: ", toCS)
-		log.Print(" in: ", in)
+		log.Print("  fromCS: ", fromCS)
+		log.Print("  toCS: ", toCS)
+		log.Print("  in: ", in)
 	}
 
 	fromSR := gdal.CreateSpatialReference("")
@@ -123,18 +123,15 @@ func getCorners(fromCS string, toCS string, in Extents) FloatExtents {
 	for _, corner := range corners {
 		wkt := fmt.Sprintf("POINT (%f %f)", corner[0], corner[1])
 		if Debug {
-			log.Print("wkt: ", wkt)
+			log.Print("    before: ", wkt)
 		}
 		point, err := gdal.CreateFromWKT(wkt, fromSR)
 		if notnil(err) {
 			panic(err)
 		}
-		if Debug {
-			log.Print("point pre-transform:", point)
-		}
 		point.TransformTo(toSR)
 		if Debug {
-			log.Print("point post-transform:", point)
+			log.Printf("    after: (%f %f)", point.X(0), point.Y(0))
 		}
 		xfloat = append(xfloat, point.X(0))
 		yfloat = append(yfloat, point.Y(0))

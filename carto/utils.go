@@ -57,7 +57,7 @@ func remove(name string) {
 	mstat, _ := os.Stat(name)
 	if mstat != nil {
 		if Debug {
-			log.Printf("removing %s", name)
+			log.Printf("Removing %s", name)
 		}
 		rerr := os.Remove(name)
 		if rerr != nil {

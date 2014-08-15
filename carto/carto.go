@@ -78,7 +78,7 @@ func MakeRegion(name string, ll FloatExtents) Region {
 	}
 	// region files will end up being stored in a directory
 	// this will be stored there too.
-	mapfile := "/tmp/map.tif"
+	mapfile := fmt.Sprintf("/tmp/%s.tif", name)
 
 	r := Region{name: name, ll: ll, tilesize: tilesize, scale: scale, vscale: vscale, trim: trim, sealevel: sealevel, maxdepth: maxdepth, vrts: vrts, albers: albers, wgs84: wgs84, mapfile: mapfile}
 	r.generateExtents()
@@ -86,7 +86,7 @@ func MakeRegion(name string, ll FloatExtents) Region {
 }
 
 func (r Region) buildMap() {
-	td, nerr := ioutil.TempDir("", "")
+	td, nerr := ioutil.TempDir("", r.name)
 	if nerr != nil {
 		panic(nerr)
 	}
@@ -349,24 +349,27 @@ func (r Region) elev(orig []float32) []int16 {
 
 func datasetInfo(ds gdal.Dataset, name string) {
 	log.Printf("%s dataset", name)
-	log.Printf("Dataset size: %d, %d", ds.RasterXSize(), ds.RasterYSize())
+	log.Printf("  Dataset size: %d, %d", ds.RasterXSize(), ds.RasterYSize())
 	gt := ds.GeoTransform()
-	log.Printf("Origin: %f, %f", gt[0], gt[3])
-	log.Printf("Pixel size: %f, %f", gt[1], gt[5])
+	log.Printf("  Origin: %f, %f", gt[0], gt[3])
+	log.Printf("  Pixel size: %f, %f", gt[1], gt[5])
 	minmaxes := datasetMinMaxes(ds)
 	for i, v := range minmaxes {
-		log.Printf("%d: %s", i+1, v)
+		log.Printf("  Band %d: %s", i+1, v)
 	}
 }
 
 func regionInfo(gt [6]float64, extents Extents) {
-	e := extents.floats()
-	xOff := (e[xMin] - gt[0]) / gt[1]
-	yOff := (e[yMax] - gt[3]) / gt[5]
-	log.Printf("Offset: %f, %f", xOff, yOff)
-	xSize := (e[xMax] - e[xMin]) / gt[1]
-	ySize := (e[yMin] - e[yMax]) / gt[5]
-	log.Printf("Size: %f, %f", xSize, ySize)
+	ef := extents.floats()
+	ei := extents.ints()
+	log.Printf("  Start: xmin %d, xmax %d", ei[xMin], ei[xMax])
+	log.Printf("         ymin %d, ymax %d", ei[yMin], ei[yMax])
+	xOff := int((ef[xMin] - gt[0]) / gt[1])
+	yOff := int((ef[yMax] - gt[3]) / gt[5])
+	log.Printf("  Offset: %d, %d", xOff, yOff)
+	xSize := int((ef[xMax] - ef[xMin]) / gt[1])
+	ySize := int((ef[yMin] - ef[yMax]) / gt[5])
+	log.Printf("  Size: %d, %d", xSize, ySize)
 }
 
 type RasterInfo struct {
