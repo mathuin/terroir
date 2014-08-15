@@ -35,7 +35,7 @@ func (r Region) bathy(inarr []int16, inx int, iny int) []int16 {
 	options := []string{fmt.Sprintf("MAXDIST=%d", r.maxdepth), fmt.Sprintf("NODATA=%d", r.maxdepth), fmt.Sprintf("VALUES=%s", strings.Join(not11, ","))}
 
 	// run computeproximity
-	err3 := srcBand.ComputeProximity(destBand, options, gdal.ScaledProgress, nil)
+	err3 := srcBand.ComputeProximity(destBand, options, gdal.DummyProgress, nil)
 	if err3 != nil && err3.Error() != "No Error" {
 		panic(err3)
 	}
