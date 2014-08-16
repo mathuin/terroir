@@ -135,6 +135,9 @@ func (idt IDT) Reduce(in chan OrdPt, out chan OrdVal, nnear int, majority bool, 
 				for i, v := range values {
 					majordict[v] += w[i]
 				}
+				if Debug {
+					log.Print("majordict: ", majordict)
+				}
 				var max float64
 				for k, v := range majordict {
 					if v > max {
@@ -148,6 +151,9 @@ func (idt IDT) Reduce(in chan OrdPt, out chan OrdVal, nnear int, majority bool, 
 					panic(err)
 				}
 			}
+		}
+		if Debug {
+			log.Print("wz: ", wz)
 		}
 		ordval.val = int16(wz)
 		out <- *ordval
