@@ -1,16 +1,261 @@
 package carto
 
 import (
+	"fmt"
 	"log"
 
 	"github.com/mathuin/gdal"
 	"github.com/mathuin/terroir/world"
 )
 
+func (r *Region) newbiome(inx int, iny int, gt [6]float64, lcarr []int16, elevarr []int16, bathyarr []int16) (biomearr []int16, berr error) {
+	product := "NLCD 2011"
+	bufferLen := len(lcarr)
+	biomearr = make([]int16, bufferLen)
+
+	// mem driver!
+	memdrv, err1 := gdal.GetDriverByName("MEM")
+	if err1 != nil {
+		return biomearr, err1
+	}
+
+	srcDS := memdrv.Create("src", inx, iny, 1, gdal.Int16, nil)
+	// top left x, west-east resolution, 0,
+	// top left y, 0, north-south resolution (negative)
+	// JMT: check this with production
+	srcDS.SetGeoTransform(gt)
+
+	// create a source band from that array
+	srcBand := srcDS.RasterBand(1)
+	err := srcBand.IO(gdal.Write, 0, 0, inx, iny, lcarr, inx, iny, 0, 0)
+	if err != nil && err.Error() != "No Error" {
+		return biomearr, err
+	}
+
+	// shapefile driver
+	outdrv := gdal.OGRDriverByName("Memory")
+	outDS, ok := outdrv.Create("out", nil)
+	if !ok {
+		return biomearr, fmt.Errorf("OGR Driver Create Fail")
+	}
+
+	// projection sigh
+	outSRS := gdal.CreateSpatialReference("")
+	// outSRS.FromProj4(albers_proj)
+	outLayer := outDS.CreateLayer("polygons", outSRS, gdal.GT_Polygon, nil)
+
+	// field definition
+	outField := gdal.CreateFieldDefinition("lc", gdal.FT_Integer)
+	outLayer.CreateField(outField, false)
+	field := 0
+
+	// options!
+	options := []string{""}
+
+	// do it!
+	err = srcBand.Polygonize(srcBand, outLayer, field, options, gdal.DummyProgress, nil)
+	if notnil(err) {
+		return biomearr, err
+	}
+
+	// iterate over features
+	fc, ok := outLayer.FeatureCount(true)
+	if !ok {
+		return biomearr, fmt.Errorf("outLayer.FeatureCount NOT OK")
+	}
+	if Debug {
+		log.Print("outLayer.FeatureCount(true): ", fc)
+	}
+	outLayer.ResetReading()
+	for i := 0; i < fc; i++ {
+		if Debug {
+			log.Printf("Feature %d", i)
+		}
+		f := outLayer.NextFeature()
+		lc, pts, err := traverse_feature(f, field, inx, iny, gt)
+		if err != nil {
+			panic(err)
+		}
+		// both class and type information available
+		lcct, err := TerrainType(lc).Data(product)
+		lcc, lct := lcct[0], lcct[1]
+		switch lcc {
+		case "Water":
+			switch lct {
+			case "Open Water":
+				// areas of open water, generally with less than 25%
+				// cover of vegetation or soil
+
+				// Biomes to consider:
+				// - "River": if we ever get hydro data...
+
+				// repeated bit of code here
+				// pts: list of points
+				// bathyarr, elevarr: need pointer
+				for _, pt := range pts {
+					var biome string
+					// unique to us here
+					bathy := bathyarr[pt]
+					if bathy > int16(r.maxdepth-1) {
+						biome = "Deep Ocean"
+					} else {
+						biome = "Ocean"
+					}
+					//not unique to us here
+					val, ok := world.Biome[biome]
+					if !ok {
+						log.Printf("%s is not a valid biome for %d!", biome, lc)
+						val = -1
+					}
+					biomearr[pt] = int16(val)
+				}
+			}
+		case "Barren":
+			// repeated bit of code here
+			// pts: list of points
+			// bathyarr, elevarr: need pointer
+			for _, pt := range pts {
+				var biome string
+				// unique to us here
+				elev := elevarr[pt]
+				if elev > 92 {
+					biome = "Desert Hills"
+				} else {
+					// or Desert M
+					biome = "Desert"
+				}
+				//not unique to us here
+				val, ok := world.Biome[biome]
+				if !ok {
+					log.Printf("%s is not a valid biome for %d!", biome, lc)
+					val = -1
+				}
+				biomearr[pt] = int16(val)
+			}
+		case "Forest":
+			// repeated bit of code here
+			// pts: list of points
+			// bathyarr, elevarr: need pointer
+			for _, pt := range pts {
+				var biome string
+				// unique to us here
+				elev := elevarr[pt]
+				if elev > 92 {
+					biome = "Forest Hills"
+				} else {
+					biome = "Forest"
+				}
+				//not unique to us here
+				val, ok := world.Biome[biome]
+				if !ok {
+					log.Printf("%s is not a valid biome for %d!", biome, lc)
+					val = -1
+				}
+				biomearr[pt] = int16(val)
+			}
+		default:
+			// plains woo
+			for _, pt := range pts {
+				var biome string
+				elev := elevarr[pt]
+				if elev > 152 {
+					// also "Extreme Hills+ M"
+					biome = "Extreme Hills M"
+				} else if elev > 122 {
+					// Also "Extreme Hills+"
+					biome = "Extreme Hills"
+				} else if elev > 92 {
+					biome = "Extreme Hills Edge"
+				} else {
+					// Rarely "Sunflower Plains"
+					biome = "Plains"
+				}
+				val, ok := world.Biome[biome]
+				if !ok {
+					log.Printf("%s is not a valid biome for %d!", biome, lc)
+					val = -1
+				}
+				biomearr[pt] = int16(val)
+			}
+		}
+	}
+	return biomearr, nil
+}
+
+func arrind(pt [2]int, inx int, iny int, gt [6]float64) (int, error) {
+	if Debug {
+		// log.Printf("x: %d, y: %d, inx: %d", pt[0], pt[1], inx)
+		// log.Printf("0: %d, 1: %d, 2: %d, 3: %d, 4: %d, 5: %d",
+		// int(gt[0]), int(gt[1]), int(gt[2]), int(gt[3]), int(gt[4]), int(gt[5]))
+		// 		log.Printf("x-0: %d, y-3: %d", pt[0]-int(gt[0]), pt[1]-int(gt[3]))
+		// log.Printf("x-0/1: %d, y-3/5: %d", (pt[0]-int(gt[0]))/int(gt[1]), (pt[1]-int(gt[3]))/int(gt[5]))
+	}
+	realx := (pt[0] - int(gt[0])) / int(gt[1])
+	if realx < 0 {
+		return 0, fmt.Errorf("realx %d < 0", realx)
+	}
+	if realx >= inx {
+		return 0, fmt.Errorf("realx %d >= inx %d", realx, inx)
+	}
+	realy := (pt[1] - int(gt[3])) / int(gt[5])
+	if realy <= 0 {
+		return 0, fmt.Errorf("realx %d < 0", realx)
+	}
+	if realy >= iny {
+		return 0, fmt.Errorf("realy %d >= iny %d", realy, iny)
+	}
+	return realx + realy*inx, nil
+}
+
+func traverse_feature(f gdal.Feature, field int, inx int, iny int, gt [6]float64) (lc int, pts []int, err error) {
+	lc = f.FieldAsInteger(field)
+	if Debug {
+		log.Printf("lc: %d", lc)
+	}
+	g := f.Geometry()
+	if !g.IsValid() {
+		// JMT: for invalid geometry, exit with no points
+		return lc, pts, err
+	}
+	e := g.Envelope()
+	eminx := int(e.MinX())
+	eminy := int(e.MinY())
+	emaxx := int(e.MaxX())
+	emaxy := int(e.MaxY())
+	// JMT: is there a way to determine whether envelopes exceed bounds?
+	if Debug {
+		log.Printf("  Envelope: (%d, %d) -> (%d, %d)", eminx, eminy, emaxx, emaxy)
+	}
+	outSRS := gdal.CreateSpatialReference("")
+	for y := eminy; y < emaxy; y -= int(gt[5]) {
+		for x := eminx; x < emaxx; x += int(gt[1]) {
+			inpt := [2]int{x, y}
+			index, aerr := arrind(inpt, inx, iny, gt)
+			// JMT: arrind returns nil if coordinates are invalid
+			if aerr != nil {
+				continue
+			}
+			if Debug {
+				// log.Printf("x: %d, y: %d, index: %d", x, y, index)
+			}
+			wkt := fmt.Sprintf("POINT (%f %f)", float64(x)+0.5*gt[1], float64(y)+0.5*gt[5])
+			pt, err := gdal.CreateFromWKT(wkt, outSRS)
+			if err != nil && err.Error() != "No Error" {
+				return lc, pts, err
+			}
+			if g.Contains(pt) {
+				pts = append(pts, index)
+				if Debug {
+					// log.Print(pts)
+				}
+			}
+		}
+	}
+	return lc, pts, nil
+}
+
 // NLCD 2011 also has canopy and impervious surfaces
 // might be "fun" to add those eventually
-
-// tests should be written to check for every assignable biome.
 
 func (r *Region) biome(lcarr []int16, elevarr []int16, bathyarr []int16) (biomearr []int16) {
 	product := "NLCD 2011"

@@ -8,6 +8,8 @@ import (
 	"os"
 	"os/exec"
 	"path"
+	"sort"
+	"strings"
 
 	"github.com/mathuin/gdal"
 	"github.com/mathuin/terroir/idt"
@@ -327,7 +329,10 @@ func (r Region) buildMap() {
 	}
 
 	// biomes
-	biomearr := r.biome(lcarr, elevarr, bathyarr)
+	biomearr, baerr := r.newbiome(rXsize, rYsize, lcGT, lcarr, elevarr, bathyarr)
+	if baerr != nil {
+		panic(baerr)
+	}
 	biomeRaster := mapDS.RasterBand(Biome)
 	biomererr := biomeRaster.IO(gdal.Write, 0, 0, rXsize, rYsize, biomearr, rXsize, rYsize, 0, 0)
 	if notnil(biomererr) {
@@ -395,6 +400,53 @@ func datasetMinMaxes(ds gdal.Dataset) []RasterInfo {
 			rbmin, rbmax = rb.ComputeMinMax(0)
 		}
 		retval[i] = RasterInfo{datatype: rbdt, min: rbmin, max: rbmax}
+	}
+	return retval
+}
+
+type RasterHInfo struct {
+	datatype string
+	buckets  map[int]int
+}
+
+func (rhi RasterHInfo) String() string {
+	retval := fmt.Sprintf("%s: ", rhi.datatype)
+	bucketlist := make([]string, len(rhi.buckets))
+
+	var keys []int
+	for k, _ := range rhi.buckets {
+		keys = append(keys, k)
+	}
+	sort.Ints(keys)
+	for i, k := range keys {
+		bucketlist[i] = fmt.Sprintf("%d: %d", k, rhi.buckets[k])
+	}
+	retval += strings.Join(bucketlist, ", ")
+	return retval
+}
+
+func datasetHistograms(ds gdal.Dataset) []RasterHInfo {
+	bandCount := ds.RasterCount()
+	retval := make([]RasterHInfo, bandCount)
+	for i := 0; i < bandCount; i++ {
+		rbi := i + 1
+		rb := ds.RasterBand(rbi)
+		rbdt := rb.RasterDataType().Name()
+
+		// read in full array
+		dsx := ds.RasterXSize()
+		dsy := ds.RasterYSize()
+		dsprod := dsx * dsy
+		rball := make([]int16, dsprod)
+		rbrerr := rb.IO(gdal.Read, 0, 0, dsx, dsy, rball, dsx, dsy, 0, 0)
+		if notnil(rbrerr) {
+			panic(rbrerr)
+		}
+		rbh := make(map[int]int)
+		for _, v := range rball {
+			rbh[int(v)]++
+		}
+		retval[i] = RasterHInfo{datatype: rbdt, buckets: rbh}
 	}
 	return retval
 }

@@ -66,3 +66,20 @@ func Test_biome(t *testing.T) {
 		}
 	}
 }
+
+// func Test_newbiome(t *testing.T) {
+// 	for _, tt := range biome_tests {
+// 		r := MakeRegion("Pie", FloatExtents{-71.575, -71.576, 41.189, 41.191})
+// 		r.maxdepth = tt.maxdepth
+// 		outarr, err := r.newbiome(tt.x, tt.y, tt.lcarr, tt.elevarr, tt.bathyarr)
+// 		if err != nil {
+// 			t.Fail()
+// 		}
+// 		for i, v := range outarr {
+// 			if v != tt.outarr[i] {
+// 				t.Errorf("expected \n%s, got \n%s", printarr(tt.outarr, tt.x, tt.y), printarr(outarr, tt.x, tt.y))
+// 				break
+// 			}
+// 		}
+// 	}
+// }
