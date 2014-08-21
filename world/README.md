@@ -197,3 +197,11 @@ Many other things are not supported because they are currently outside the scope
  * Tripwire and Tripwire Hook
  * Heads
 
+# Stuff to keep in mind
+
+## Optimization
+
+Check to see if a section is empty and just don't write it?
+
+Skip writing any air blocks at first?
+
