@@ -72,7 +72,7 @@ func (r *Region) newbiome(inx int, iny int, gt [6]float64, lcarr []int16, elevar
 			log.Printf("Feature %d", i)
 		}
 		f := outLayer.NextFeature()
-		lc, pts, err := traverse_feature(f, field, inx, iny, gt)
+		lc, pts, err := traverseFeature(f, field, inx, iny, gt, lcarr)
 		if err != nil {
 			panic(err)
 		}
@@ -182,32 +182,34 @@ func (r *Region) newbiome(inx int, iny int, gt [6]float64, lcarr []int16, elevar
 	return biomearr, nil
 }
 
+var ArrindDebug = false
+
 func arrind(pt [2]int, inx int, iny int, gt [6]float64) (int, error) {
-	if Debug {
-		// log.Printf("x: %d, y: %d, inx: %d", pt[0], pt[1], inx)
-		// log.Printf("0: %d, 1: %d, 2: %d, 3: %d, 4: %d, 5: %d",
-		// int(gt[0]), int(gt[1]), int(gt[2]), int(gt[3]), int(gt[4]), int(gt[5]))
-		// 		log.Printf("x-0: %d, y-3: %d", pt[0]-int(gt[0]), pt[1]-int(gt[3]))
-		// log.Printf("x-0/1: %d, y-3/5: %d", (pt[0]-int(gt[0]))/int(gt[1]), (pt[1]-int(gt[3]))/int(gt[5]))
+	if ArrindDebug {
+		log.Printf("x: %d, y: %d, inx: %d", pt[0], pt[1], inx)
+		log.Printf("0: %d, 1: %d, 2: %d, 3: %d, 4: %d, 5: %d",
+			int(gt[0]), int(gt[1]), int(gt[2]), int(gt[3]), int(gt[4]), int(gt[5]))
+		log.Printf("x-0: %d, y-3: %d", pt[0]-int(gt[0]), pt[1]-int(gt[3]))
+		log.Printf("x-0/1: %d, y-3/5: %d", (pt[0]-int(gt[0]))/int(gt[1]), (pt[1]-int(gt[3]))/int(gt[5]))
 	}
 	realx := (pt[0] - int(gt[0])) / int(gt[1])
 	if realx < 0 {
 		return 0, fmt.Errorf("realx %d < 0", realx)
 	}
-	if realx >= inx {
+	if realx > inx {
 		return 0, fmt.Errorf("realx %d >= inx %d", realx, inx)
 	}
-	realy := (pt[1] - int(gt[3])) / int(gt[5])
-	if realy <= 0 {
+	realy := (pt[1]-int(gt[3]))/int(gt[5]) - 1
+	if realy < 0 {
 		return 0, fmt.Errorf("realx %d < 0", realx)
 	}
-	if realy >= iny {
-		return 0, fmt.Errorf("realy %d >= iny %d", realy, iny)
+	if realy > iny {
+		return 0, fmt.Errorf("realy %d > iny %d", realy, iny)
 	}
 	return realx + realy*inx, nil
 }
 
-func traverse_feature(f gdal.Feature, field int, inx int, iny int, gt [6]float64) (lc int, pts []int, err error) {
+func traverseFeature(f gdal.Feature, field int, inx int, iny int, gt [6]float64, lcarr []int16) (lc int, pts []int, err error) {
 	lc = f.FieldAsInteger(field)
 	if Debug {
 		log.Printf("lc: %d", lc)
@@ -215,6 +217,9 @@ func traverse_feature(f gdal.Feature, field int, inx int, iny int, gt [6]float64
 	g := f.Geometry()
 	if !g.IsValid() {
 		// JMT: for invalid geometry, exit with no points
+		if Debug {
+			log.Print("Invalid geometry!")
+		}
 		return lc, pts, err
 	}
 	e := g.Envelope()
@@ -233,12 +238,15 @@ func traverse_feature(f gdal.Feature, field int, inx int, iny int, gt [6]float64
 			index, aerr := arrind(inpt, inx, iny, gt)
 			// JMT: arrind returns nil if coordinates are invalid
 			if aerr != nil {
+				if Debug {
+					log.Printf("aerr was not nil: %s", aerr.Error())
+				}
 				continue
 			}
 			if Debug {
-				// log.Printf("x: %d, y: %d, index: %d", x, y, index)
+				log.Printf("x: %d, y: %d, index: %d (%d)", x, y, index, lcarr[index])
 			}
-			wkt := fmt.Sprintf("POINT (%f %f)", float64(x)+0.5*gt[1], float64(y)+0.5*gt[5])
+			wkt := fmt.Sprintf("POINT (%f %f)", float64(x)+0.5*gt[1], float64(y)-0.5*gt[5])
 			pt, err := gdal.CreateFromWKT(wkt, outSRS)
 			if err != nil && err.Error() != "No Error" {
 				return lc, pts, err
