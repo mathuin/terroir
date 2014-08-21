@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/lukeroth/gdal"
+	"github.com/mathuin/gdal"
 )
 
 func (r Region) bathy(inarr []int16, inx int, iny int) []int16 {

@@ -9,7 +9,7 @@ import (
 	"os/exec"
 	"path"
 
-	"github.com/lukeroth/gdal"
+	"github.com/mathuin/gdal"
 	"github.com/mathuin/terroir/idt"
 )
 

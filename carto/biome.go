@@ -3,6 +3,7 @@ package carto
 import (
 	"log"
 
+	"github.com/mathuin/gdal"
 	"github.com/mathuin/terroir/world"
 )
 

@@ -4,7 +4,7 @@ import (
 	"path"
 	"testing"
 
-	"github.com/lukeroth/gdal"
+	"github.com/mathuin/gdal"
 )
 
 var buildMap_tests = []struct {
