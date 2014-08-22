@@ -25,7 +25,6 @@ const (
 	Elevation
 	Bathy
 	Crust
-	Biome
 	NumLayers = iota - 1
 )
 
@@ -205,7 +204,11 @@ func (r Region) buildMap() {
 	mapDS := driver.Create(r.mapfile, rXsize, rYsize, NumLayers, gdal.Int16, nil)
 	defer mapDS.Close()
 
-	mapDS.SetGeoTransform(elGT)
+	var newGT [6]float64
+	for i, v := range elGT {
+		newGT[i] = v / float64(r.scale)
+	}
+	mapDS.SetGeoTransform(newGT)
 
 	mapSRS := gdal.CreateSpatialReference("")
 	mapSRS.FromProj4(albers_proj)
@@ -326,17 +329,6 @@ func (r Region) buildMap() {
 	lcrerr = lcRaster.IO(gdal.Write, 0, 0, rXsize, rYsize, lcarr, rXsize, rYsize, 0, 0)
 	if notnil(lcrerr) {
 		panic(lcrerr)
-	}
-
-	// biomes
-	biomearr, baerr := r.newbiome(rXsize, rYsize, lcGT, lcarr, elevarr, bathyarr)
-	if baerr != nil {
-		panic(baerr)
-	}
-	biomeRaster := mapDS.RasterBand(Biome)
-	biomererr := biomeRaster.IO(gdal.Write, 0, 0, rXsize, rYsize, biomearr, rXsize, rYsize, 0, 0)
-	if notnil(biomererr) {
-		panic(biomererr)
 	}
 
 	if Debug {
