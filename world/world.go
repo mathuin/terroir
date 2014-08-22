@@ -26,6 +26,10 @@ func (xz XZ) String() string {
 	return fmt.Sprintf("(%d, %d)", xz.X, xz.Z)
 }
 
+func (xz XZ) Point(y int32) Point {
+	return Point{X: xz.X, Y: y, Z: xz.Z}
+}
+
 type World struct {
 	SaveDir    string
 	Name       string
