@@ -302,7 +302,8 @@ func (r Region) buildMap() {
 	// nodata is treated as water, which is 11
 	newlcBuffer := make([]int, lcbufferLen)
 	for i, v := range lcBuffer {
-		if v == byte(lcNodata) {
+		// JMT: 0 also represents nodata in NLCD
+		if v == byte(lcNodata) || v == byte(0) {
 			lcBuffer[i] = 11
 		}
 		newlcBuffer[i] = int(lcBuffer[i])
