@@ -64,13 +64,13 @@ func (idt IDT) Call(base [][2]int, nnear int, majority bool) (outarr []int16, er
 	nCPU := runtime.NumCPU()
 	runtime.GOMAXPROCS(nCPU)
 	for i := 0; i < nCPU*nCPU; i++ {
+		wg.Add(1)
 		go func(i int) {
-			wg.Add(1)
 			if Debug {
 				log.Printf("Starting reducer #%d!", i)
 			}
+			defer wg.Done()
 			idt.Reduce(in, out, nnear, majority, i)
-			wg.Done()
 		}(i)
 	}
 	go func() { wg.Wait(); close(out) }()

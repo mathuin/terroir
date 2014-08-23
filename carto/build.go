@@ -94,10 +94,10 @@ func (r *Region) buildWorld() (*world.World, error) {
 	}
 
 	for i := 0; i < numWorkers; i++ {
+		wg.Add(1)
 		go func(i int) {
-			wg.Add(1)
+			defer wg.Done()
 			r.processFeatures(in, out, i)
-			wg.Done()
 		}(i)
 	}
 	go func() { wg.Wait(); close(out) }()

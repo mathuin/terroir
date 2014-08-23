@@ -35,10 +35,10 @@ func (w *World) writeRegion(dir string, key XZ) error {
 	var wg sync.WaitGroup
 
 	for i := 0; i < runtime.NumCPU(); i++ {
+		wg.Add(1)
 		go func(i int) {
-			wg.Add(1)
+			defer wg.Done()
 			WriteChunkToRegion(in, out, i)
-			wg.Done()
 		}(i)
 	}
 	go func() { wg.Wait(); close(out) }()
