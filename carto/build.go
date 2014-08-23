@@ -5,20 +5,19 @@ import (
 	"log"
 	"runtime"
 
-	"sort"
-	"strings"
 	"sync"
 
 	"github.com/mathuin/gdal"
 	"github.com/mathuin/terroir/world"
 )
 
+// JMT: convert to XZ, biome value, and list 0->n of points
 type Out struct {
 	blocks map[world.Point]world.Block
 	spawn  world.Point
 }
 
-func (r Region) genFeatures(in chan gdal.Feature) {
+func (r Region) genFeatures(in chan Feature) {
 	ds, err := gdal.Open(r.mapfile, gdal.ReadOnly)
 	if err != nil {
 		panic(err)
@@ -52,7 +51,7 @@ func (r Region) genFeatures(in chan gdal.Feature) {
 	field := 0
 
 	// options!
-	options := []string{""}
+	options := []string{}
 
 	// do it!
 	err = lcBand.Polygonize(lcBand, outLayer, field, options, gdal.DummyProgress, nil)
@@ -70,7 +69,7 @@ func (r Region) genFeatures(in chan gdal.Feature) {
 	}
 	outLayer.ResetReading()
 	for i := 0; i < fc; i++ {
-		in <- outLayer.NextFeature()
+		in <- Feature{outLayer.NextFeature()}
 	}
 	close(in)
 }
@@ -82,12 +81,12 @@ func (r *Region) buildWorld() (*world.World, error) {
 	w.SetSaveDir(".")
 	spawnpt := world.MakePoint(0, 0, 0)
 
-	in := make(chan gdal.Feature)
+	in := make(chan Feature)
 	out := make(chan Out)
 
 	var wg sync.WaitGroup
 
-	numWorkers := runtime.NumCPU()
+	numWorkers := runtime.NumCPU() * runtime.NumCPU()
 	if Debug {
 		log.Print("debug mode - only starting one worker")
 		numWorkers = 1
@@ -103,25 +102,11 @@ func (r *Region) buildWorld() (*world.World, error) {
 	go func() { wg.Wait(); close(out) }()
 	go r.genFeatures(in)
 
-	flag := false
+	blockcount := 0
 	for block := range out {
-		if !flag {
-			flag = true
-			logout := fmt.Sprintf("First block: ")
-			blocklist := make([]string, len(block.blocks))
-			var keys world.Points
-			for k, _ := range block.blocks {
-				keys = append(keys, k)
-			}
-			sort.Sort(keys)
-			for i, k := range keys {
-				blocklist[i] = fmt.Sprintf("%s: %s", k, block.blocks[k])
-			}
-			logout += strings.Join(blocklist, ", ")
-			// log.Print(logout)
-		}
+		blockcount++
 		if Debug {
-			log.Printf("new set of blocks received: %d blocks", len(block.blocks))
+			// log.Printf("set #%d of blocks received: %d blocks", blockcount, len(block.blocks))
 		}
 		for k, v := range block.blocks {
 			w.SetBlock(k, &v)
@@ -132,6 +117,9 @@ func (r *Region) buildWorld() (*world.World, error) {
 				log.Printf("new spawn: %s", block.spawn)
 			}
 			spawnpt = block.spawn
+		}
+		if Debug {
+			// log.Printf("set #%d of %d blocks processed", blockcount, len(block.blocks))
 		}
 	}
 
@@ -167,7 +155,7 @@ func arrind2(x int, y int, inx int, iny int, gt [6]float64) (int, error) {
 	return realx + realy*inx, nil
 }
 
-func (r *Region) processFeatures(in chan gdal.Feature, out chan Out, i int) {
+func (r *Region) processFeatures(in chan Feature, out chan Out, i int) {
 	ds, err := gdal.Open(r.mapfile, gdal.ReadOnly)
 	if err != nil {
 		panic(err)
@@ -177,8 +165,6 @@ func (r *Region) processFeatures(in chan gdal.Feature, out chan Out, i int) {
 	}
 	inx := ds.RasterXSize()
 	iny := ds.RasterYSize()
-	gt := ds.GeoTransform()
-	srs := gdal.CreateSpatialReference(ds.Projection())
 	bufferLen := inx * iny
 
 	lcarr := make([]int16, bufferLen)
@@ -209,100 +195,176 @@ func (r *Region) processFeatures(in chan gdal.Feature, out chan Out, i int) {
 		panic(crustrerr)
 	}
 
+	processed := 0
+
 	for f := range in {
-		pts := [][3]int{}
-		// field 0 is the only field here
-		lc := f.FieldAsInteger(0)
+		// if !f.isValid() {
+		// 	g := f.Geometry()
+		// 	if !g.IsValid() {
+		// 		newg := g.SimplifyPreservingTopology(4)
+		// 		if !newg.IsValid() {
+		// 			panic("WTF D00D")
+		// 		}
+		// 	}
+		// 	// JMT: for invalid geometry, exit with no points
+		// 	log.Printf("%d: Invalid geometry!", i)
+		// 	continue
+		// }
+		processed++
+
+		head := fmt.Sprintf("%d: feature #%d", i, processed)
 
 		if Debug {
-			log.Printf("%d: lc: %d", i, lc)
+			log.Printf("%s begins", head)
 		}
-
-		g := f.Geometry()
-		if !g.IsValid() {
-			// JMT: for invalid geometry, exit with no points
-			log.Printf("%d: Invalid geometry!", i)
+		pts := f.Points(ds, head, lcarr)
+		if len(pts) == 0 {
+			log.Printf("%s: No points in geometry!", head)
+			log.Print("SCRATCH ONE FEATURE")
 			continue
 		}
-		e := g.Envelope()
-		eminx := int(e.MinX())
-		eminy := int(e.MinY())
-		emaxx := int(e.MaxX())
-		emaxy := int(e.MaxY())
-		// JMT: is there a way to determine whether envelopes exceed bounds?
-		if Debug {
-			log.Printf("%d: Envelope: (%d, %d) -> (%d, %d)", i, eminx, eminy, emaxx, emaxy)
+
+		lc := f.LCValue()
+
+		lame := map[int]string{
+			11: "Water",
+			21: "Stone",
+			22: "Stone",
+			23: "Stone",
+			24: "Stone",
+			31: "Sand",
+			41: "Dirt",
+			42: "Dirt",
+			43: "Dirt",
+			71: "Grass Block",
+			90: "Water",
+			95: "Water",
 		}
 
-		// JMT: for now, just iterate through all the points in this particular polygon
-		posspts := 0
-		for y := eminy; y < emaxy; y -= int(gt[5]) {
-			for x := eminx; x < emaxx; x += int(gt[1]) {
-				posspts++
-				index, aerr := arrind2(x, y, inx, iny, gt)
-				// JMT: arrind returns nil if coordinates are invalid
-				if aerr != nil {
-					log.Printf("%d: aerr was not nil: %s", i, aerr.Error())
-					continue
-				}
-				inpt := [3]int{x, y, index}
-				if Debug {
-					// log.Printf("%d: x: %d, y: %d, index: %d (%d)", i, x, y, index, lcarr[index])
-				}
-				if lcarr[index] != int16(lc) {
-					continue
-				}
-				wkt := fmt.Sprintf("POINT (%f %f)", float64(x)+0.5*gt[1], float64(y)-0.5*gt[5])
-				pt, err := gdal.CreateFromWKT(wkt, srs)
-				if err != nil && err.Error() != "No Error" {
-					log.Printf("%d: gdal.CreateFromWKT() error: %s", i, err.Error())
-					continue
-				}
-				if g.Contains(pt) {
-					pts = append(pts, inpt)
-				}
+		var putit *world.Block
+		if val, ok := lame[lc]; ok {
+			putit, err = world.BlockNamed(val)
+			if err != nil {
+				panic(err)
+			}
+		} else {
+			log.Printf("%s: LC value %d not found!", head, lc)
+			putit, err = world.BlockNamed("Dirt")
+			if err != nil {
+				panic(err)
 			}
 		}
 
-		if Debug {
-			log.Printf("%d: %d pts (%d possible) in feature", i, len(pts), posspts)
-		}
+		// blocks := make(map[world.Point]world.Block)
+		spawn := world.Point{}
 
-		cout := new(Out)
-		cout.blocks = make(map[world.Point]world.Block)
-		cout.spawn = world.Point{}
 		bedrockBlock, _ := world.BlockNamed("Bedrock")
-		// waterBlock, _ := world.BlockNamed("Water")
-		dirtBlock, _ := world.BlockNamed("Dirt")
-		stoneBlock, _ := world.BlockNamed("Stone")
+
+		totblks := 0
 		for _, pt := range pts {
-			var putit *world.Block
-			switch lc {
-			case 11:
-				putit = stoneBlock
-			default:
-				putit = dirtBlock
-			}
-			// elev := int32(elevarr[pt[2]])
-			elev := int32(62)
+			blocks := make(map[world.Point]world.Block)
+
+			elev := int32(elevarr[pt[2]])
 			// bathy := bathyarr[pt[2]]
 			// crust := crustarr[pt[2]]
 
 			// build xz from pt
 			xz := world.XZ{X: int32(pt[0]), Z: int32(pt[1])}
-			cout.blocks[xz.Point(0)] = *bedrockBlock
+			blocks[xz.Point(0)] = *bedrockBlock
 			for y := 1; y <= int(elev); y++ {
-				cout.blocks[xz.Point(int32(y))] = *putit
+				blocks[xz.Point(int32(y))] = *putit
 			}
 
-			if elev > cout.spawn.Y {
-				cout.spawn = xz.Point(elev)
+			if elev > spawn.Y {
+				spawn = xz.Point(elev)
 			}
+			totblks += len(blocks)
+			out <- Out{blocks: blocks, spawn: spawn}
 		}
 		if Debug {
-			log.Printf("%d: %d pts in blocks", i, len(cout.blocks))
-			log.Printf("%d: spawn: %v", i, cout.spawn)
+			log.Printf("%s ends, %d blocks, spawn: %v", head, totblks, spawn)
 		}
-		out <- *cout
+		// out <- Out{blocks: blocks, spawn: spawn}
 	}
+}
+
+type Feature struct {
+	gdal.Feature
+}
+
+// returns true if the feature is valid
+func (f Feature) isValid() bool {
+	return f.Geometry().IsValid()
+}
+
+// returns the landcover value
+func (f Feature) LCValue() int {
+	// field 0 is the only field here
+	return f.FieldAsInteger(0)
+}
+
+// returns a list of points from the feature
+// x, y, index
+func (f Feature) Points(ds gdal.Dataset, head string, lcarr []int16) [][3]int {
+	inx := ds.RasterXSize()
+	iny := ds.RasterYSize()
+	gt := ds.GeoTransform()
+	srs := gdal.CreateSpatialReference(ds.Projection())
+
+	pts := [][3]int{}
+	lc := f.LCValue()
+
+	if Debug {
+		log.Printf("%s: lc: %d", head, lc)
+	}
+
+	g := f.Geometry()
+	e := g.Envelope()
+	eminx := int(e.MinX())
+	eminy := int(e.MinY())
+	emaxx := int(e.MaxX())
+	emaxy := int(e.MaxY())
+	totcols := ((emaxy - eminy) / -1 * int(gt[5])) * ((emaxx - eminx) / int(gt[1]))
+	// JMT: is there a way to determine whether envelopes exceed bounds?
+	if Debug {
+		log.Printf("%s: Envelope: (%d, %d) -> (%d, %d), %d total possible columns", head, eminx, eminy, emaxx, emaxy, totcols)
+	}
+
+	posscols := 0
+	tenth := int(float64(totcols) / float64(10.0))
+	for y := eminy; y < emaxy; y -= int(gt[5]) {
+		for x := eminx; x < emaxx; x += int(gt[1]) {
+			posscols++
+			if totcols > 10000 && posscols%tenth == 0 {
+				log.Printf("%s: %d of %d cols", head, posscols, totcols)
+			}
+			index, aerr := arrind2(x, y, inx, iny, gt)
+			// JMT: arrind returns nil if coordinates are invalid
+			if aerr != nil {
+				log.Printf("%s: aerr was not nil: %s", head, aerr.Error())
+				continue
+			}
+			if Debug {
+				// log.Printf("%d: x: %d, y: %d, index: %d", i, x, y, index)
+			}
+			if lcarr[index] != int16(lc) {
+				continue
+			}
+			wkt := fmt.Sprintf("POINT (%f %f)", float64(x)+0.5*gt[1], float64(y)-0.5*gt[5])
+			pt, err := gdal.CreateFromWKT(wkt, srs)
+			if notnil(err) {
+				log.Printf("%s: gdal.CreateFromWKT() error: %s", head, err.Error())
+				continue
+			}
+			if g.Contains(pt) {
+				pts = append(pts, [3]int{x, y, index})
+			}
+		}
+	}
+
+	if Debug {
+		log.Printf("%s: %d pts (%d possible cols) in feature", head, len(pts), posscols)
+	}
+
+	return pts
 }
