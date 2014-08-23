@@ -89,8 +89,8 @@ func MakeRegion(name string, ll FloatExtents) Region {
 
 func MakeRegion2(name string, ll FloatExtents, elname string, lcname string) Region {
 	// firm defaults
-	scale := 6
-	vscale := 6
+	scale := 30  // 6
+	vscale := 30 // 6
 	trim := 0
 	tilesize := 256
 	sealevel := 62
