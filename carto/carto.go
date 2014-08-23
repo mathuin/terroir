@@ -13,6 +13,7 @@ import (
 
 	"github.com/mathuin/gdal"
 	"github.com/mathuin/terroir/idt"
+	"github.com/mathuin/terroir/world"
 )
 
 var Debug = false
@@ -63,8 +64,8 @@ type Region struct {
 
 func MakeRegion(name string, ll FloatExtents) Region {
 	// firm defaults
-	scale := 6
-	vscale := 6
+	scale := 30  // 6
+	vscale := 30 // 6
 	trim := 0
 	tilesize := 256
 	sealevel := 62
@@ -77,6 +78,32 @@ func MakeRegion(name string, ll FloatExtents) Region {
 		albers[key] = IntExtents{}
 		wgs84[key] = FloatExtents{}
 	}
+	// region files will end up being stored in a directory
+	// this will be stored there too.
+	mapfile := fmt.Sprintf("/tmp/%s.tif", name)
+
+	r := Region{name: name, ll: ll, tilesize: tilesize, scale: scale, vscale: vscale, trim: trim, sealevel: sealevel, maxdepth: maxdepth, vrts: vrts, albers: albers, wgs84: wgs84, mapfile: mapfile}
+	r.generateExtents()
+	return r
+}
+
+func MakeRegion2(name string, ll FloatExtents, elname string, lcname string) Region {
+	// firm defaults
+	scale := 6
+	vscale := 6
+	trim := 0
+	tilesize := 256
+	sealevel := 62
+	maxdepth := 30
+	vrts := map[string]string{}
+	albers := map[string]IntExtents{}
+	wgs84 := map[string]FloatExtents{}
+	for _, key := range keys {
+		albers[key] = IntExtents{}
+		wgs84[key] = FloatExtents{}
+	}
+	vrts["elevation"] = path.Join(name, elname)
+	vrts["landcover"] = path.Join(name, lcname)
 	// region files will end up being stored in a directory
 	// this will be stored there too.
 	mapfile := fmt.Sprintf("/tmp/%s.tif", name)
@@ -441,4 +468,9 @@ func datasetHistograms(ds gdal.Dataset) []RasterHInfo {
 		retval[i] = RasterHInfo{datatype: rbdt, buckets: rbh}
 	}
 	return retval
+}
+
+func (r *Region) BuildMapWorld() (*world.World, error) {
+	r.buildMap()
+	return r.buildWorld()
 }
