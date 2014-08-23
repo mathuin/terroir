@@ -95,7 +95,7 @@ var blockData = []struct {
 	{29, 0, "Sticky Piston"},
 	{30, 0, "Cobweb"},
 	{31, 0, "Shrub"},
-	{31, 1, "Grass "},
+	{31, 1, "Grass"},
 	{31, 2, "Fern"},
 	{31, 3, "Grass (Biome)"},
 	{32, 0, "Dead Bush"},
