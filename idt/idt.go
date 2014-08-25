@@ -57,13 +57,14 @@ func (idt IDT) Call(base [][2]int, nnear int, majority bool) (outarr []int16, er
 
 	var wg sync.WaitGroup
 
+	nCPU := runtime.NumCPU()
+	numWorkers := nCPU * nCPU
 	if Debug {
-		log.Printf("Now running IDT on %d CPUs!", runtime.NumCPU())
+		log.Printf("debug mode -- only one worker!")
+		numWorkers = 1
 	}
 
-	nCPU := runtime.NumCPU()
-	runtime.GOMAXPROCS(nCPU)
-	for i := 0; i < nCPU*nCPU; i++ {
+	for i := 0; i < numWorkers; i++ {
 		wg.Add(1)
 		go func(i int) {
 			if Debug {
@@ -136,11 +137,18 @@ func (idt IDT) Reduce(in chan OrdPt, out chan OrdVal, nnear int, majority bool, 
 					majordict[v] += w[i]
 				}
 				if Debug {
-					log.Print("majordict: ", majordict)
+					log.Print("majordict: ")
+					for k, v := range majordict {
+						log.Printf(" %d: %f", k, v)
+					}
 				}
-				var max float64
+				major := float64(0)
 				for k, v := range majordict {
-					if v > max {
+					if v > major {
+						if Debug {
+							log.Printf("new max value %f with ind %d", v, k)
+						}
+						major = v
 						wz = k
 					}
 				}
