@@ -89,6 +89,9 @@ func (idt IDT) Reduce(in chan OrdPt, out chan OrdVal, nnear int, majority bool, 
 		ordval := new(OrdVal)
 		ordval.index = ordpt.index
 		q := ordpt.pt
+		if Debug {
+			log.Printf("pt: %+#v", q)
+		}
 
 		nk := kdtree.NewNKeeper(nnear)
 		idt.tree.NearestSet(nk, q)
@@ -176,5 +179,5 @@ func dot(x []float64, y []int) (int, error) {
 	for i := range x {
 		retval += x[i] * float64(y[i])
 	}
-	return int(retval), nil
+	return int(retval + 0.5), nil
 }
