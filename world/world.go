@@ -186,6 +186,44 @@ func ReadWorld(dir string, name string, loadAllChunks bool) (*World, error) {
 	return &w, nil
 }
 
+func (w *World) Biome(xz XZ) (byte, error) {
+	pt := xz.Point(0)
+	c, err := w.Chunk(pt)
+	if err != nil {
+		return byte(0), err
+	}
+	return c.biomes[pt.Index()], nil
+}
+
+func (w *World) SetBiome(xz XZ, b byte) error {
+	pt := xz.Point(0)
+	c, err := w.Chunk(pt)
+	if err != nil {
+		return err
+	}
+	c.biomes[pt.Index()] = b
+	return nil
+}
+
+func (w *World) HeightMap(xz XZ) (int32, error) {
+	pt := xz.Point(0)
+	c, err := w.Chunk(pt)
+	if err != nil {
+		return int32(0), err
+	}
+	return c.heightMap[pt.Index()], nil
+}
+
+func (w *World) SetHeightMap(xz XZ, i int32) error {
+	pt := xz.Point(0)
+	c, err := w.Chunk(pt)
+	if err != nil {
+		return err
+	}
+	c.heightMap[pt.Index()] = i
+	return nil
+}
+
 // JMT: currently unused
 func (w *World) BlockLight(pt Point) (byte, error) {
 	s, err := w.Section(pt)
@@ -222,8 +260,21 @@ func (w *World) SetSkyLight(pt Point, b byte) error {
 }
 
 func (w World) Section(pt Point) (*Section, error) {
-	cXZ := pt.ChunkXZ()
+	c, err := w.Chunk(pt)
+	if err != nil {
+		return nil, err
+	}
 	yf := int(floor(pt.Y, 16))
+	s, ok := c.Sections[yf]
+	if !ok {
+		c.Sections[yf] = MakeSection()
+		s = c.Sections[yf]
+	}
+	return &s, nil
+}
+
+func (w World) Chunk(pt Point) (*Chunk, error) {
+	cXZ := pt.ChunkXZ()
 	c, ok := w.ChunkMap[cXZ]
 	if !ok {
 		cp, lerr := w.loadChunk(cXZ)
@@ -236,14 +287,8 @@ func (w World) Section(pt Point) (*Section, error) {
 			cp = mcp
 		}
 		c = *cp
-
 	}
-	s, ok := c.Sections[yf]
-	if !ok {
-		c.Sections[yf] = MakeSection()
-		s = c.Sections[yf]
-	}
-	return &s, nil
+	return &c, nil
 }
 
 // arguments are in chunk coordinates
