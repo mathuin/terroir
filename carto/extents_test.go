@@ -21,7 +21,7 @@ var generateExtents_tests = []struct {
 
 func Test_generateExtents(t *testing.T) {
 	for _, tt := range generateExtents_tests {
-		r := MakeRegion("Pie", tt.ll)
+		r := MakeRegion("Pie", tt.ll, "", "")
 		r.tilesize = 1024
 		r.generateExtents()
 		for maptype, subarr := range tt.albers {

@@ -36,7 +36,7 @@ var bathy_tests = []struct {
 
 func Test_bathy(t *testing.T) {
 	for _, tt := range bathy_tests {
-		r := MakeRegion("Pie", FloatExtents{-71.575, -71.576, 41.189, 41.191})
+		r := MakeRegion("Pie", FloatExtents{-71.575, -71.576, 41.189, 41.191}, "", "")
 		r.maxdepth = tt.maxdepth
 		outarr := r.bathy(tt.inarr, tt.inx, tt.iny)
 

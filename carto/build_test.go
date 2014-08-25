@@ -1,7 +1,6 @@
 package carto
 
 import (
-	"path"
 	"testing"
 
 	"github.com/mathuin/terroir/world"
@@ -18,11 +17,11 @@ var buildWorld_tests = []struct {
 
 func Test_buildWorld(t *testing.T) {
 	for _, tt := range buildWorld_tests {
-		r := MakeRegion(tt.name, tt.ll)
-		r.vrts["elevation"] = path.Join(tt.name, tt.elname)
-		r.vrts["landcover"] = path.Join(tt.name, tt.lcname)
+		r := MakeRegion(tt.name, tt.ll, tt.elname, tt.lcname)
 		// Debug = true
 		r.buildMap()
+		// Debug = false
+		// Debug = true
 		w, err := r.buildWorld()
 		if err != nil {
 			t.Fail()

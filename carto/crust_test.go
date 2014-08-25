@@ -6,7 +6,7 @@ import (
 )
 
 func Test_crust(t *testing.T) {
-	r := MakeRegion("Pie", FloatExtents{-71.575, -71.576, 41.189, 41.191})
+	r := MakeRegion("Pie", FloatExtents{-71.575, -71.576, 41.189, 41.191}, "", "")
 	crustBuffer := r.crust(100, 150)
 	minwidth := int16(1)
 	maxwidth := int16(5)
