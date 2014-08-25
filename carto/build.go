@@ -12,9 +12,10 @@ import (
 )
 
 // JMT: convert to XZ, biome value, and list 0->n of points
-type Out struct {
-	blocks map[world.Point]world.Block
-	spawn  world.Point
+type Column struct {
+	xz     world.XZ
+	biome  string
+	blocks []string
 }
 
 func (r Region) genFeatures(in chan Feature) {
@@ -82,7 +83,7 @@ func (r *Region) buildWorld() (*world.World, error) {
 	spawnpt := world.MakePoint(0, 0, 0)
 
 	in := make(chan Feature)
-	out := make(chan Out)
+	out := make(chan Column)
 
 	var wg sync.WaitGroup
 
@@ -102,25 +103,37 @@ func (r *Region) buildWorld() (*world.World, error) {
 	go func() { wg.Wait(); close(out) }()
 	go r.genFeatures(in)
 
-	blockcount := 0
-	for block := range out {
-		blockcount++
-		if Debug {
-			// log.Printf("set #%d of blocks received: %d blocks", blockcount, len(block.blocks))
+	columncount := 0
+	for column := range out {
+		columncount++
+
+		b, ok := world.Biome[column.biome]
+		if !ok {
+			err := fmt.Errorf("biome %s not in world.Biome", column.biome)
+			panic(err)
 		}
-		for k, v := range block.blocks {
-			w.SetBlock(k, &v)
+		w.SetBiome(column.xz, byte(b))
+
+		for k, v := range column.blocks {
+			pt := world.Point{X: column.xz.X, Y: int32(k), Z: column.xz.Z}
+			b, err := world.BlockNamed(v)
+			if err != nil {
+				panic(err)
+			}
+			w.SetBlock(pt, b)
 		}
 
-		if spawnpt.Y < block.spawn.Y || spawnpt.Z == 0 {
+		topBlock := world.Point{X: column.xz.X, Y: int32(len(column.blocks)), Z: column.xz.Z}
+
+		if topBlock.Y > spawnpt.Y {
 			if Debug {
-				log.Printf("new spawn: %s", block.spawn)
+				log.Printf("new spawn: %s", topBlock)
 			}
-			spawnpt = block.spawn
+			spawnpt = topBlock
 		}
-		if Debug {
-			// log.Printf("set #%d of %d blocks processed", blockcount, len(block.blocks))
-		}
+
+		// JMT: naive lighting here
+		w.SetSkyLight(topBlock, 15)
 	}
 
 	w.SetSpawn(spawnpt)
@@ -155,7 +168,7 @@ func arrind2(x int, y int, inx int, iny int, gt [6]float64) (int, error) {
 	return realx + realy*inx, nil
 }
 
-func (r *Region) processFeatures(in chan Feature, out chan Out, i int) {
+func (r *Region) processFeatures(in chan Feature, out chan Column, i int) {
 	ds, err := gdal.Open(r.mapfile, gdal.ReadOnly)
 	if err != nil {
 		panic(err)
@@ -198,18 +211,6 @@ func (r *Region) processFeatures(in chan Feature, out chan Out, i int) {
 	processed := 0
 
 	for f := range in {
-		// if !f.isValid() {
-		// 	g := f.Geometry()
-		// 	if !g.IsValid() {
-		// 		newg := g.SimplifyPreservingTopology(4)
-		// 		if !newg.IsValid() {
-		// 			panic("WTF D00D")
-		// 		}
-		// 	}
-		// 	// JMT: for invalid geometry, exit with no points
-		// 	log.Printf("%d: Invalid geometry!", i)
-		// 	continue
-		// }
 		processed++
 
 		head := fmt.Sprintf("%d: feature #%d", i, processed)
@@ -226,65 +227,66 @@ func (r *Region) processFeatures(in chan Feature, out chan Out, i int) {
 
 		lc := f.LCValue()
 
-		lame := map[int]string{
-			11: "Water",
-			21: "Stone",
-			22: "Stone",
-			23: "Stone",
-			24: "Stone",
-			31: "Sand",
-			41: "Dirt",
-			42: "Dirt",
-			43: "Dirt",
-			71: "Grass Block",
-			90: "Water",
-			95: "Water",
-		}
+		switch lc {
+		case 11:
+			// "open water"
+			for _, pt := range pts {
+				elev := elevarr[pt[2]]
+				bathy := bathyarr[pt[2]]
+				crust := crustarr[pt[2]]
 
-		var putit *world.Block
-		if val, ok := lame[lc]; ok {
-			putit, err = world.BlockNamed(val)
-			if err != nil {
-				panic(err)
+				col := Column{}
+				col.xz = world.XZ{X: int32(pt[0]), Z: int32(pt[1])}
+
+				if int(bathy) <= r.maxdepth-1 {
+					col.biome = "Deep Ocean"
+				} else {
+					col.biome = "Ocean"
+				}
+
+				blocks := make([]string, elev)
+
+				for y := int16(0); y < elev; y++ {
+					if y == 0 {
+						blocks[y] = "Bedrock"
+					} else if y < (elev - bathy - crust) {
+						blocks[y] = "Stone"
+					} else if y < (elev - bathy) {
+						blocks[y] = "Gravel"
+					} else {
+						blocks[y] = "Water"
+					}
+				}
+				col.blocks = blocks
+				out <- col
 			}
-		} else {
-			log.Printf("%s: LC value %d not found!", head, lc)
-			putit, err = world.BlockNamed("Dirt")
-			if err != nil {
-				panic(err)
+		default:
+			// anything else
+			for _, pt := range pts {
+				elev := elevarr[pt[2]]
+				crust := crustarr[pt[2]]
+
+				col := Column{}
+				col.xz = world.XZ{X: int32(pt[0]), Z: int32(pt[1])}
+				col.biome = "Plains"
+
+				blocks := make([]string, elev)
+
+				for y := int16(0); y < elev; y++ {
+					if y == 0 {
+						blocks[y] = "Bedrock"
+					} else if y < (elev - crust - 1) {
+						blocks[y] = "Stone"
+					} else if y < elev-1 {
+						blocks[y] = "Dirt"
+					} else {
+						blocks[y] = "Grass Block"
+					}
+				}
+				col.blocks = blocks
+				out <- col
 			}
 		}
-
-		// blocks := make(map[world.Point]world.Block)
-		spawn := world.Point{}
-
-		bedrockBlock, _ := world.BlockNamed("Bedrock")
-
-		totblks := 0
-		for _, pt := range pts {
-			blocks := make(map[world.Point]world.Block)
-
-			elev := int32(elevarr[pt[2]])
-			// bathy := bathyarr[pt[2]]
-			// crust := crustarr[pt[2]]
-
-			// build xz from pt
-			xz := world.XZ{X: int32(pt[0]), Z: int32(pt[1])}
-			blocks[xz.Point(0)] = *bedrockBlock
-			for y := 1; y <= int(elev); y++ {
-				blocks[xz.Point(int32(y))] = *putit
-			}
-
-			if elev > spawn.Y {
-				spawn = xz.Point(elev)
-			}
-			totblks += len(blocks)
-			out <- Out{blocks: blocks, spawn: spawn}
-		}
-		if Debug {
-			log.Printf("%s ends, %d blocks, spawn: %v", head, totblks, spawn)
-		}
-		// out <- Out{blocks: blocks, spawn: spawn}
 	}
 }
 
@@ -336,7 +338,9 @@ func (f Feature) Points(ds gdal.Dataset, head string, lcarr []int16) [][3]int {
 		for x := eminx; x < emaxx; x += int(gt[1]) {
 			posscols++
 			if totcols > 10000 && posscols%tenth == 0 {
-				log.Printf("%s: %d of %d cols", head, posscols, totcols)
+				if Debug {
+					log.Printf("%s: %d of %d cols", head, posscols, totcols)
+				}
 			}
 			index, aerr := arrind2(x, y, inx, iny, gt)
 			// JMT: arrind returns nil if coordinates are invalid
