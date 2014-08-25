@@ -62,39 +62,17 @@ type Region struct {
 	mapfile string
 }
 
-func MakeRegion(name string, ll FloatExtents) Region {
-	// firm defaults
-	scale := 30  // 6
-	vscale := 30 // 6
+func MakeRegion(name string, ll FloatExtents, elname string, lcname string) Region {
+	scale := 6
+	vscale := 6
 	trim := 0
 	tilesize := 256
 	sealevel := 62
 	maxdepth := 30
-	vrts := map[string]string{}
-	albers := map[string]IntExtents{}
-	wgs84 := map[string]FloatExtents{}
-	for _, key := range keys {
-		vrts[key] = ""
-		albers[key] = IntExtents{}
-		wgs84[key] = FloatExtents{}
-	}
-	// region files will end up being stored in a directory
-	// this will be stored there too.
-	mapfile := fmt.Sprintf("/tmp/%s.tif", name)
-
-	r := Region{name: name, ll: ll, tilesize: tilesize, scale: scale, vscale: vscale, trim: trim, sealevel: sealevel, maxdepth: maxdepth, vrts: vrts, albers: albers, wgs84: wgs84, mapfile: mapfile}
-	r.generateExtents()
-	return r
+	return MakeRegionFull(name, ll, elname, lcname, scale, vscale, trim, tilesize, sealevel, maxdepth)
 }
 
-func MakeRegion2(name string, ll FloatExtents, elname string, lcname string) Region {
-	// firm defaults
-	scale := 30  // 6
-	vscale := 30 // 6
-	trim := 0
-	tilesize := 256
-	sealevel := 62
-	maxdepth := 30
+func MakeRegionFull(name string, ll FloatExtents, elname string, lcname string, scale int, vscale int, trim int, tilesize int, sealevel int, maxdepth int) Region {
 	vrts := map[string]string{}
 	albers := map[string]IntExtents{}
 	wgs84 := map[string]FloatExtents{}
@@ -330,7 +308,7 @@ func (r Region) buildMap() {
 		panic(lcerr)
 	}
 
-	deptharr, derr := lcIDT.Call(depthCoords, 1, true)
+	deptharr, derr := lcIDT.Call(depthCoords, 11, true)
 	if derr != nil {
 		panic(derr)
 	}
