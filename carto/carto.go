@@ -13,7 +13,6 @@ import (
 
 	"github.com/mathuin/gdal"
 	"github.com/mathuin/terroir/idt"
-	"github.com/mathuin/terroir/world"
 )
 
 var Debug = false
@@ -91,7 +90,7 @@ func MakeRegionFull(name string, ll FloatExtents, elname string, lcname string, 
 	return r
 }
 
-func (r Region) buildMap() {
+func (r Region) BuildMap() {
 	td, nerr := ioutil.TempDir("", r.name)
 	if nerr != nil {
 		panic(nerr)
@@ -209,11 +208,7 @@ func (r Region) buildMap() {
 	mapDS := driver.Create(r.mapfile, rXsize, rYsize, NumLayers, gdal.Int16, nil)
 	defer mapDS.Close()
 
-	var newGT [6]float64
-	for i, v := range elGT {
-		newGT[i] = v / float64(r.scale)
-	}
-	mapDS.SetGeoTransform(newGT)
+	mapDS.SetGeoTransform(elGT)
 
 	mapSRS := gdal.CreateSpatialReference("")
 	mapSRS.FromProj4(albers_proj)
@@ -356,8 +351,8 @@ func datasetInfo(ds gdal.Dataset, name string) {
 	gt := ds.GeoTransform()
 	log.Printf("  Origin: %f, %f", gt[0], gt[3])
 	log.Printf("  Pixel size: %f, %f", gt[1], gt[5])
-	minmaxes := datasetMinMaxes(ds)
-	for i, v := range minmaxes {
+	histos := datasetHistograms(ds)
+	for i, v := range histos {
 		log.Printf("  Band %d: %s", i+1, v)
 	}
 }
@@ -447,9 +442,4 @@ func datasetHistograms(ds gdal.Dataset) []RasterHInfo {
 		retval[i] = RasterHInfo{datatype: rbdt, buckets: rbh}
 	}
 	return retval
-}
-
-func (r *Region) BuildMapWorld() (*world.World, error) {
-	r.buildMap()
-	return r.buildWorld()
 }

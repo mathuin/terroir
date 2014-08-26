@@ -15,14 +15,14 @@ var buildWorld_tests = []struct {
 	{"BlockIsland", FloatExtents{-71.575, -71.576, 41.189, 41.191}, "elevation.tif", "landcover.tif"},
 }
 
-func Test_buildWorld(t *testing.T) {
+func Test_BuildWorld(t *testing.T) {
 	for _, tt := range buildWorld_tests {
 		r := MakeRegion(tt.name, tt.ll, tt.elname, tt.lcname)
 		// Debug = true
-		r.buildMap()
+		r.BuildMap()
 		// Debug = false
 		// Debug = true
-		w, err := r.buildWorld()
+		w, err := r.BuildWorld()
 		if err != nil {
 			t.Fail()
 		}

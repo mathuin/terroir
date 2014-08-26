@@ -75,7 +75,7 @@ func (r Region) genFeatures(in chan Feature) {
 	close(in)
 }
 
-func (r *Region) buildWorld() (*world.World, error) {
+func (r *Region) BuildWorld() (*world.World, error) {
 	w := world.MakeWorld(r.name)
 	w.SetRandomSeed(0)
 	// JMT: need a sane storage location for files
@@ -87,11 +87,11 @@ func (r *Region) buildWorld() (*world.World, error) {
 
 	var wg sync.WaitGroup
 
-	numWorkers := runtime.NumCPU() * runtime.NumCPU()
-	if Debug {
-		log.Print("debug mode - only starting one worker")
-		numWorkers = 1
-	}
+	numWorkers := runtime.NumCPU()
+	// if Debug {
+	// 	log.Print("debug mode - only starting one worker")
+	// 	numWorkers = 1
+	// }
 
 	for i := 0; i < numWorkers; i++ {
 		wg.Add(1)
@@ -143,22 +143,22 @@ func (r *Region) buildWorld() (*world.World, error) {
 
 var Arrind2Debug = false
 
-func arrind2(x int, y int, inx int, iny int, gt [6]float64) (int, error) {
+func arrind2(x int32, y int32, inx int32, iny int32, gti [6]int32) (int32, error) {
 	if Arrind2Debug {
 		log.Printf("x: %d, y: %d, inx: %d", x, y, inx)
 		log.Printf("0: %d, 1: %d, 2: %d, 3: %d, 4: %d, 5: %d",
-			int(gt[0]), int(gt[1]), int(gt[2]), int(gt[3]), int(gt[4]), int(gt[5]))
-		log.Printf("x-0: %d, y-3: %d", x-int(gt[0]), y-int(gt[3]))
-		log.Printf("x-0/1: %d, y-3/5: %d", (x-int(gt[0]))/int(gt[1]), (y-int(gt[3]))/int(gt[5]))
+			gti[0], gti[1], gti[2], gti[3], gti[4], gti[5])
+		log.Printf("x-0: %d, y-3: %d", x-gti[0], y-gti[3])
+		log.Printf("x-0/1: %d, y-3/5: %d", (x-gti[0])/gti[1], (y-gti[3])/gti[5])
 	}
-	realx := (x - int(gt[0])) / int(gt[1])
+	realx := (x - gti[0]) / gti[1]
 	if realx < 0 {
 		return 0, fmt.Errorf("realx %d < 0", realx)
 	}
 	if realx > inx {
 		return 0, fmt.Errorf("realx %d >= inx %d", realx, inx)
 	}
-	realy := (y-int(gt[3]))/int(gt[5]) - 1
+	realy := (y-gti[3])/gti[5] - 1
 	if realy < 0 {
 		return 0, fmt.Errorf("realx %d < 0", realx)
 	}
@@ -173,7 +173,7 @@ func (r *Region) processFeatures(in chan Feature, out chan Column, i int) {
 	if err != nil {
 		panic(err)
 	}
-	if Debug {
+	if Debug && i == 0 {
 		datasetInfo(ds, "processFeatures")
 	}
 	inx := ds.RasterXSize()
@@ -210,15 +210,18 @@ func (r *Region) processFeatures(in chan Feature, out chan Column, i int) {
 
 	processed := 0
 
+	// first pass at memoize
+	// memo := make(map[string]Column)
+
 	for f := range in {
 		processed++
 
 		head := fmt.Sprintf("%d: feature #%d", i, processed)
 
-		if Debug {
-			log.Printf("%s begins", head)
-		}
-		pts := f.Points(ds, head, lcarr)
+		// if Debug {
+		// 	log.Printf("%s begins", head)
+		// }
+		pts := f.Points(ds, head)
 		if len(pts) == 0 {
 			log.Printf("%s: No points in geometry!", head)
 			log.Print("SCRATCH ONE FEATURE")
@@ -226,17 +229,22 @@ func (r *Region) processFeatures(in chan Feature, out chan Column, i int) {
 		}
 
 		lc := f.LCValue()
-
 		switch lc {
 		case 11:
 			// "open water"
 			for _, pt := range pts {
-				elev := elevarr[pt[2]]
-				bathy := bathyarr[pt[2]]
-				crust := crustarr[pt[2]]
+				elev := elevarr[pt.index]
+				bathy := bathyarr[pt.index]
+				crust := crustarr[pt.index]
+
+				// key := fmt.Sprintf("%d|%d|%d|%d", lc, elev, bathy, crust)
+				// if col, ok := memo[key]; ok {
+				// 	out <- col
+				// 	continue
+				// }
 
 				col := Column{}
-				col.xz = world.XZ{X: int32(pt[0]), Z: int32(pt[1])}
+				col.xz = pt.xz
 
 				if int(bathy) <= r.maxdepth-1 {
 					col.biome = "Deep Ocean"
@@ -258,16 +266,24 @@ func (r *Region) processFeatures(in chan Feature, out chan Column, i int) {
 					}
 				}
 				col.blocks = blocks
+				// memo[key] = col
 				out <- col
 			}
 		default:
 			// anything else
 			for _, pt := range pts {
-				elev := elevarr[pt[2]]
-				crust := crustarr[pt[2]]
+				elev := elevarr[pt.index]
+				// bathy := bathyarr[pt.index]
+				crust := crustarr[pt.index]
+
+				// key := fmt.Sprintf("%d|%d|%d|%d", lc, elev, bathy, crust)
+				// if col, ok := memo[key]; ok {
+				// 	out <- col
+				// 	continue
+				// }
 
 				col := Column{}
-				col.xz = world.XZ{X: int32(pt[0]), Z: int32(pt[1])}
+				col.xz = pt.xz
 				col.biome = "Plains"
 
 				blocks := make([]string, elev)
@@ -284,6 +300,7 @@ func (r *Region) processFeatures(in chan Feature, out chan Column, i int) {
 					}
 				}
 				col.blocks = blocks
+				// memo[key] = col
 				out <- col
 			}
 		}
@@ -305,70 +322,101 @@ func (f Feature) LCValue() int {
 	return f.FieldAsInteger(0)
 }
 
-// returns a list of points from the feature
-// x, y, index
-func (f Feature) Points(ds gdal.Dataset, head string, lcarr []int16) [][3]int {
+// generates list of points and sends them to a channel
+func (f Feature) genPoints(in chan world.XZ, gti [6]int32) {
+	g := f.Geometry()
+	e := g.Envelope()
+	eminx := int32(e.MinX())
+	eminy := int32(e.MinY())
+	emaxx := int32(e.MaxX())
+	emaxy := int32(e.MaxY())
+
+	for y := eminy; y < emaxy; y -= gti[5] {
+		for x := eminx; x < emaxx; x += gti[1] {
+			in <- world.XZ{X: x, Z: y}
+		}
+	}
+	close(in)
+}
+
+type XZIndex struct {
+	xz    world.XZ
+	index int32
+}
+
+func (f Feature) Points(ds gdal.Dataset, head string) []XZIndex {
 	inx := ds.RasterXSize()
 	iny := ds.RasterYSize()
 	gt := ds.GeoTransform()
 	srs := gdal.CreateSpatialReference(ds.Projection())
 
-	pts := [][3]int{}
-	lc := f.LCValue()
-
-	if Debug {
-		log.Printf("%s: lc: %d", head, lc)
+	lcarr := make([]int16, inx*iny)
+	lcBand := ds.RasterBand(Landcover)
+	lcrerr := lcBand.IO(gdal.Read, 0, 0, inx, iny, lcarr, inx, iny, 0, 0)
+	if notnil(lcrerr) {
+		panic(lcrerr)
 	}
 
-	g := f.Geometry()
-	e := g.Envelope()
-	eminx := int(e.MinX())
-	eminy := int(e.MinY())
-	emaxx := int(e.MaxX())
-	emaxy := int(e.MaxY())
-	totcols := ((emaxy - eminy) / -1 * int(gt[5])) * ((emaxx - eminx) / int(gt[1]))
-	// JMT: is there a way to determine whether envelopes exceed bounds?
-	if Debug {
-		log.Printf("%s: Envelope: (%d, %d) -> (%d, %d), %d total possible columns", head, eminx, eminy, emaxx, emaxy, totcols)
+	var gti [6]int32
+	for i, v := range gt {
+		gti[i] = int32(v)
 	}
 
-	posscols := 0
-	tenth := int(float64(totcols) / float64(10.0))
-	for y := eminy; y < emaxy; y -= int(gt[5]) {
-		for x := eminx; x < emaxx; x += int(gt[1]) {
-			posscols++
-			if totcols > 10000 && posscols%tenth == 0 {
-				if Debug {
-					log.Printf("%s: %d of %d cols", head, posscols, totcols)
-				}
-			}
-			index, aerr := arrind2(x, y, inx, iny, gt)
-			// JMT: arrind returns nil if coordinates are invalid
-			if aerr != nil {
-				log.Printf("%s: aerr was not nil: %s", head, aerr.Error())
-				continue
-			}
-			if Debug {
-				// log.Printf("%d: x: %d, y: %d, index: %d", i, x, y, index)
-			}
-			if lcarr[index] != int16(lc) {
-				continue
-			}
-			wkt := fmt.Sprintf("POINT (%f %f)", float64(x)+0.5*gt[1], float64(y)-0.5*gt[5])
-			pt, err := gdal.CreateFromWKT(wkt, srs)
-			if notnil(err) {
-				log.Printf("%s: gdal.CreateFromWKT() error: %s", head, err.Error())
-				continue
-			}
-			if g.Contains(pt) {
-				pts = append(pts, [3]int{x, y, index})
+	in := make(chan world.XZ)
+	out := make(chan XZIndex)
+
+	var wg sync.WaitGroup
+
+	numWorkers := runtime.NumCPU()
+
+	for i := 0; i < numWorkers; i++ {
+		wg.Add(1)
+		go func(i int) {
+			defer wg.Done()
+			ppHead := fmt.Sprintf("%s %d", head, i)
+			f.processPoints(in, out, inx, iny, gti, srs, lcarr, ppHead)
+		}(i)
+	}
+	go func() { wg.Wait(); close(out) }()
+	go f.genPoints(in, gti)
+
+	pts := []XZIndex{}
+	ptcount := 0
+	for pt := range out {
+		if Debug {
+			if ptcount > 1 && ptcount%10000 == 0 {
+				log.Printf("%s: %d columns", head, ptcount)
 			}
 		}
+		ptcount++
+		pts = append(pts, pt)
 	}
-
-	if Debug {
-		log.Printf("%s: %d pts (%d possible cols) in feature", head, len(pts), posscols)
-	}
-
 	return pts
+}
+
+func (f Feature) processPoints(in chan world.XZ, out chan XZIndex, inx int, iny int, gti [6]int32, srs gdal.SpatialReference, lcarr []int16, ppHead string) {
+	g := f.Geometry()
+
+	lc := f.LCValue()
+
+	for xz := range in {
+		index, aerr := arrind2(xz.X, xz.Z, int32(inx), int32(iny), gti)
+		// JMT: arrind returns nil if coordinates are invalid
+		if aerr != nil {
+			log.Printf("%s: aerr was not nil: %s", ppHead, aerr.Error())
+			continue
+		}
+		if lcarr[index] != int16(lc) {
+			continue
+		}
+		wkt := fmt.Sprintf("POINT (%f %f)", float64(xz.X)+0.5*float64(gti[1]), float64(xz.Z)-0.5*float64(gti[5]))
+		pt, err := gdal.CreateFromWKT(wkt, srs)
+		if notnil(err) {
+			log.Printf("%s: gdal.CreateFromWKT() error: %s", ppHead, err.Error())
+			continue
+		}
+		if g.Contains(pt) {
+			out <- XZIndex{xz: xz, index: index}
+		}
+	}
 }
