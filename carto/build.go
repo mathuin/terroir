@@ -344,6 +344,10 @@ type XZIndex struct {
 	index int32
 }
 
+func makeXZIndex(xz world.XZ, index int32, gti [6]int32) XZIndex {
+	return XZIndex{xz: world.XZ{X: xz.X / gti[1], Z: xz.Z / gti[5]}, index: index}
+}
+
 func (f Feature) Points(ds gdal.Dataset, head string) []XZIndex {
 	inx := ds.RasterXSize()
 	iny := ds.RasterYSize()
@@ -416,7 +420,7 @@ func (f Feature) processPoints(in chan world.XZ, out chan XZIndex, inx int, iny 
 			continue
 		}
 		if g.Contains(pt) {
-			out <- XZIndex{xz: world.XZ{X: xz.X / gti[1], Z: xz.Z / gti[5]}, index: index}
+			out <- makeXZIndex(xz, index, gti)
 		}
 	}
 }
