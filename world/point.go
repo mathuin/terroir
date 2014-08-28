@@ -23,7 +23,19 @@ func (p Point) String() string {
 }
 
 func (pt Point) Index() int {
-	return int(pt.X%16 + pt.Z%16*16 + pt.Y%16*16*16)
+	remX := pt.X % 16
+	if remX < 0 {
+		remX += 16
+	}
+	remY := pt.Y % 16
+	if remY < 0 {
+		remY += 16
+	}
+	remZ := pt.Z % 16
+	if remZ < 0 {
+		remZ += 16
+	}
+	return int(remX%16 + remZ%16*16 + remY%16*16*16)
 }
 
 func (p Point) ChunkXZ() XZ {

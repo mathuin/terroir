@@ -12,7 +12,7 @@ var point_tests = []struct {
 }{
 	{0, 0, 0, 0, 0, 0},
 	{0, 128, 0, 0, 0, 0},
-	{27, 0, -15, 1, -1, -229},
+	{27, 0, -15, 1, -1, 27},
 }
 
 func Test_MakePoint(t *testing.T) {
