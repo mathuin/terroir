@@ -104,8 +104,8 @@ func Test_FullReadWriteRead(t *testing.T) {
 	}
 	pt := MakePoint(0, 60, 0)
 	pt2 := MakePoint(1, 60, 0)
-	nw.SetBlock(pt, obsidian)
-	nw.SetBlock(pt2, obsidian)
+	nw.SetBlock(pt, *obsidian)
+	nw.SetBlock(pt2, *obsidian)
 
 	newSaveDir, nerr := ioutil.TempDir("", "")
 	if nerr != nil {
@@ -176,7 +176,7 @@ func Test_tinyWorld(t *testing.T) {
 		if err != nil {
 			t.Fail()
 		}
-		w.SetBlock(pv.p, b)
+		w.SetBlock(pv.p, *b)
 	}
 
 	// now write the level

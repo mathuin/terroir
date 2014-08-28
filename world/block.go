@@ -28,7 +28,7 @@ func (w World) Block(pt Point) (*Block, error) {
 	return &b, nil
 }
 
-func (w *World) SetBlock(pt Point, b *Block) error {
+func (w *World) SetBlock(pt Point, b Block) error {
 	base := byte(b.block % 256)
 	add := byte(b.block / 256)
 	s, err := w.Section(pt)
