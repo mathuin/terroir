@@ -71,6 +71,10 @@ func MakeRegion(name string, ll FloatExtents, elname string, lcname string) Regi
 	return MakeRegionFull(name, ll, elname, lcname, scale, vscale, trim, tilesize, sealevel, maxdepth)
 }
 
+// JMT: leading dot is bad
+var datasetDir = "./datasets"
+var mapsDir = "./maps"
+
 func MakeRegionFull(name string, ll FloatExtents, elname string, lcname string, scale int, vscale int, trim int, tilesize int, sealevel int, maxdepth int) Region {
 	vrts := map[string]string{}
 	albers := map[string]IntExtents{}
@@ -79,11 +83,9 @@ func MakeRegionFull(name string, ll FloatExtents, elname string, lcname string, 
 		albers[key] = IntExtents{}
 		wgs84[key] = FloatExtents{}
 	}
-	vrts["elevation"] = path.Join(name, elname)
-	vrts["landcover"] = path.Join(name, lcname)
-	// region files will end up being stored in a directory
-	// this will be stored there too.
-	mapfile := fmt.Sprintf("/tmp/%s.tif", name)
+	vrts["elevation"] = path.Join(datasetDir, name, elname)
+	vrts["landcover"] = path.Join(datasetDir, name, lcname)
+	mapfile := path.Join(mapsDir, name, fmt.Sprintf("%s.tif", name))
 
 	r := Region{name: name, ll: ll, tilesize: tilesize, scale: scale, vscale: vscale, trim: trim, sealevel: sealevel, maxdepth: maxdepth, vrts: vrts, albers: albers, wgs84: wgs84, mapfile: mapfile}
 	r.generateExtents()
