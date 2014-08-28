@@ -85,7 +85,7 @@ func MakeRegionFull(name string, ll FloatExtents, elname string, lcname string, 
 	}
 	vrts["elevation"] = path.Join(datasetDir, name, elname)
 	vrts["landcover"] = path.Join(datasetDir, name, lcname)
-	mapfile := path.Join(mapsDir, name, fmt.Sprintf("%s.tif", name))
+	mapfile := path.Join(mapsDir, fmt.Sprintf("%s.tif", name))
 
 	r := Region{name: name, ll: ll, tilesize: tilesize, scale: scale, vscale: vscale, trim: trim, sealevel: sealevel, maxdepth: maxdepth, vrts: vrts, albers: albers, wgs84: wgs84, mapfile: mapfile}
 	r.generateExtents()
