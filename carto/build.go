@@ -14,8 +14,24 @@ import (
 // JMT: convert to XZ, biome value, and list 0->n of points
 type Column struct {
 	xz     world.XZ
-	biome  string
-	blocks []string
+	biome  int           // was string
+	blocks []world.Block // []string
+}
+
+func makeColumn(xz world.XZ, biome string, blocks []string) Column {
+	bval, ok := world.Biome[biome]
+	if !ok {
+		log.Panicf("%s not found in world.Biome", biome)
+	}
+	bvals := make([]world.Block, len(blocks))
+	for i, v := range blocks {
+		bval, err := world.BlockNamed(v)
+		if err != nil {
+			panic(err)
+		}
+		bvals[i] = *bval
+	}
+	return Column{xz: xz, biome: bval, blocks: bvals}
 }
 
 func (r Region) genFeatures(in chan Feature) {
@@ -107,20 +123,10 @@ func (r *Region) BuildWorld() (*world.World, error) {
 	for column := range out {
 		columncount++
 
-		b, ok := world.Biome[column.biome]
-		if !ok {
-			err := fmt.Errorf("biome %s not in world.Biome", column.biome)
-			panic(err)
-		}
-		w.SetBiome(column.xz, byte(b))
+		w.SetBiome(column.xz, byte(column.biome))
 
 		for k, v := range column.blocks {
-			pt := world.Point{X: column.xz.X, Y: int32(k), Z: column.xz.Z}
-			b, err := world.BlockNamed(v)
-			if err != nil {
-				panic(err)
-			}
-			w.SetBlock(pt, b)
+			w.SetBlock(world.Point{X: column.xz.X, Y: int32(k), Z: column.xz.Z}, v)
 		}
 
 		topBlock := world.Point{X: column.xz.X, Y: int32(len(column.blocks)), Z: column.xz.Z}
@@ -211,7 +217,7 @@ func (r *Region) processFeatures(in chan Feature, out chan Column, i int) {
 	processed := 0
 
 	// first pass at memoize
-	// memo := make(map[string]Column)
+	memo := make(map[string]Column)
 
 	for f := range in {
 		processed++
@@ -237,19 +243,17 @@ func (r *Region) processFeatures(in chan Feature, out chan Column, i int) {
 				bathy := bathyarr[pt.index]
 				crust := crustarr[pt.index]
 
-				// key := fmt.Sprintf("%d|%d|%d|%d", lc, elev, bathy, crust)
-				// if col, ok := memo[key]; ok {
-				// 	out <- col
-				// 	continue
-				// }
+				key := fmt.Sprintf("%d|%d|%d|%d", lc, elev, bathy, crust)
+				if col, ok := memo[key]; ok {
+					out <- col
+					continue
+				}
 
-				col := Column{}
-				col.xz = pt.xz
-
+				var biome string
 				if int(bathy) <= r.maxdepth-1 {
-					col.biome = "Deep Ocean"
+					biome = "Deep Ocean"
 				} else {
-					col.biome = "Ocean"
+					biome = "Ocean"
 				}
 
 				blocks := make([]string, elev)
@@ -265,26 +269,24 @@ func (r *Region) processFeatures(in chan Feature, out chan Column, i int) {
 						blocks[y] = "Water"
 					}
 				}
-				col.blocks = blocks
-				// memo[key] = col
+				col := makeColumn(pt.xz, biome, blocks)
+				memo[key] = col
 				out <- col
 			}
 		default:
 			// anything else
 			for _, pt := range pts {
 				elev := elevarr[pt.index]
-				// bathy := bathyarr[pt.index]
+				bathy := bathyarr[pt.index]
 				crust := crustarr[pt.index]
 
-				// key := fmt.Sprintf("%d|%d|%d|%d", lc, elev, bathy, crust)
-				// if col, ok := memo[key]; ok {
-				// 	out <- col
-				// 	continue
-				// }
+				key := fmt.Sprintf("%d|%d|%d|%d", lc, elev, bathy, crust)
+				if col, ok := memo[key]; ok {
+					out <- col
+					continue
+				}
 
-				col := Column{}
-				col.xz = pt.xz
-				col.biome = "Plains"
+				biome := "Plains"
 
 				blocks := make([]string, elev)
 
@@ -299,8 +301,8 @@ func (r *Region) processFeatures(in chan Feature, out chan Column, i int) {
 						blocks[y] = "Grass Block"
 					}
 				}
-				col.blocks = blocks
-				// memo[key] = col
+				col := makeColumn(pt.xz, biome, blocks)
+				memo[key] = col
 				out <- col
 			}
 		}
