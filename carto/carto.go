@@ -303,7 +303,7 @@ func (r Region) BuildMap() {
 		panic(lcerr)
 	}
 
-	deptharr, derr := lcIDT.Call(depthCoords, 11, true)
+	deptharr, derr := lcIDT.Call(depthCoords, 31, true)
 	if derr != nil {
 		panic(derr)
 	}

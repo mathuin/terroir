@@ -30,7 +30,7 @@ func (r Region) crust(rXsize int, rYsize int) []int16 {
 	if err != nil {
 		panic(err)
 	}
-	crustBuffer, err := crustIDT.Call(crustBase, 11, false)
+	crustBuffer, err := crustIDT.Call(crustBase, 31, false)
 	if err != nil {
 		panic(err)
 	}
