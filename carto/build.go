@@ -416,7 +416,7 @@ func (f Feature) processPoints(in chan world.XZ, out chan XZIndex, inx int, iny 
 			continue
 		}
 		if g.Contains(pt) {
-			out <- XZIndex{xz: xz, index: index}
+			out <- XZIndex{xz: world.XZ{X: xz.X / gti[1], Z: xz.Z / gti[5]}, index: index}
 		}
 	}
 }
