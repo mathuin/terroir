@@ -244,10 +244,6 @@ func (r *Region) processFeatures(in chan Feature, out chan Column, i int) {
 				crust := crustarr[pt.index]
 
 				key := fmt.Sprintf("%d|%d|%d|%d", lc, elev, bathy, crust)
-				if col, ok := memo[key]; ok {
-					out <- col
-					continue
-				}
 
 				var biome string
 				if int(bathy) <= r.maxdepth-1 {
@@ -256,8 +252,12 @@ func (r *Region) processFeatures(in chan Feature, out chan Column, i int) {
 					biome = "Ocean"
 				}
 
+				if col, ok := memo[key]; ok {
+					col.xz = pt.xz
+					out <- col
+					continue
+				}
 				blocks := make([]string, elev)
-
 				for y := int16(0); y < elev; y++ {
 					if y == 0 {
 						blocks[y] = "Bedrock"
@@ -281,15 +281,15 @@ func (r *Region) processFeatures(in chan Feature, out chan Column, i int) {
 				crust := crustarr[pt.index]
 
 				key := fmt.Sprintf("%d|%d|%d|%d", lc, elev, bathy, crust)
-				if col, ok := memo[key]; ok {
-					out <- col
-					continue
-				}
 
 				biome := "Plains"
 
+				if col, ok := memo[key]; ok {
+					col.xz = pt.xz
+					out <- col
+					continue
+				}
 				blocks := make([]string, elev)
-
 				for y := int16(0); y < elev; y++ {
 					if y == 0 {
 						blocks[y] = "Bedrock"
