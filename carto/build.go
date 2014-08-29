@@ -94,8 +94,6 @@ func (r Region) genFeatures(in chan Feature) {
 func (r *Region) BuildWorld() (*world.World, error) {
 	w := world.MakeWorld(r.name)
 	w.SetRandomSeed(0)
-	// JMT: need a sane storage location for files
-	w.SetSaveDir(".")
 	spawnpt := world.MakePoint(0, 0, 0)
 
 	in := make(chan Feature)
