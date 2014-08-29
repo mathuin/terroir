@@ -109,6 +109,8 @@ func (r *Region) BuildWorld() (*world.World, error) {
 	// 	numWorkers = 1
 	// }
 
+	// JMT: consider moving memo up here
+
 	for i := 0; i < numWorkers; i++ {
 		wg.Add(1)
 		go func(i int) {
@@ -125,21 +127,21 @@ func (r *Region) BuildWorld() (*world.World, error) {
 
 		w.SetBiome(column.xz, byte(column.biome))
 
+		pt := column.xz.Point(int32(0))
 		for k, v := range column.blocks {
-			w.SetBlock(world.Point{X: column.xz.X, Y: int32(k), Z: column.xz.Z}, v)
+			pt.Y = int32(k)
+			w.SetBlock(pt, v)
 		}
 
-		topBlock := world.Point{X: column.xz.X, Y: int32(len(column.blocks)), Z: column.xz.Z}
-
-		if topBlock.Y > spawnpt.Y {
+		if pt.Y > spawnpt.Y {
 			if Debug {
-				log.Printf("new spawn: %s", topBlock)
+				log.Printf("new spawn: %s", pt)
 			}
-			spawnpt = topBlock
+			spawnpt = pt
 		}
 
 		// JMT: naive lighting here
-		w.SetSkyLight(topBlock, 15)
+		w.SetSkyLight(pt, 15)
 	}
 
 	w.SetSpawn(spawnpt)
@@ -217,7 +219,7 @@ func (r *Region) processFeatures(in chan Feature, out chan Column, i int) {
 	processed := 0
 
 	// first pass at memoize
-	memo := make(map[string]Column)
+	// memo := make(map[string]Column)
 
 	for f := range in {
 		processed++
@@ -243,20 +245,20 @@ func (r *Region) processFeatures(in chan Feature, out chan Column, i int) {
 				bathy := bathyarr[pt.index]
 				crust := crustarr[pt.index]
 
-				key := fmt.Sprintf("%d|%d|%d|%d", lc, elev, bathy, crust)
+				// key := fmt.Sprintf("%d|%d|%d|%d", lc, elev, bathy, crust)
 
 				var biome string
-				if int(bathy) <= r.maxdepth-1 {
+				if int(bathy) >= r.maxdepth-1 {
 					biome = "Deep Ocean"
 				} else {
 					biome = "Ocean"
 				}
 
-				if col, ok := memo[key]; ok {
-					col.xz = pt.xz
-					out <- col
-					continue
-				}
+				// if col, ok := memo[key]; ok {
+				// 	col.xz = pt.xz
+				// 	out <- col
+				// 	continue
+				// }
 				blocks := make([]string, elev)
 				for y := int16(0); y < elev; y++ {
 					if y == 0 {
@@ -270,25 +272,71 @@ func (r *Region) processFeatures(in chan Feature, out chan Column, i int) {
 					}
 				}
 				col := makeColumn(pt.xz, biome, blocks)
-				memo[key] = col
+				// memo[key] = col
 				out <- col
 			}
-		default:
-			// anything else
+		case 31:
+			// "barren land"
 			for _, pt := range pts {
 				elev := elevarr[pt.index]
-				bathy := bathyarr[pt.index]
+				// bathy := bathyarr[pt.index]
 				crust := crustarr[pt.index]
 
-				key := fmt.Sprintf("%d|%d|%d|%d", lc, elev, bathy, crust)
+				// key := fmt.Sprintf("%d|%d|%d|%d", lc, elev, bathy, crust)
 
-				biome := "Plains"
-
-				if col, ok := memo[key]; ok {
-					col.xz = pt.xz
-					out <- col
-					continue
+				var biome string
+				if elev > 92 {
+					biome = "Desert Hills"
+				} else {
+					biome = "Desert"
 				}
+
+				// if col, ok := memo[key]; ok {
+				// 	col.xz = pt.xz
+				// 	out <- col
+				// 	continue
+				// }
+				blocks := make([]string, elev)
+				for y := int16(0); y < elev; y++ {
+					if y == 0 {
+						blocks[y] = "Bedrock"
+					} else if y < (elev - crust - 1) {
+						blocks[y] = "Stone"
+					} else if y < elev-1 {
+						blocks[y] = "Sandstone"
+					} else {
+						blocks[y] = "Sand"
+					}
+				}
+				col := makeColumn(pt.xz, biome, blocks)
+				// memo[key] = col
+				out <- col
+			}
+		case 41:
+			fallthrough
+		case 42:
+			fallthrough
+		case 43:
+			// "forest"
+			for _, pt := range pts {
+				elev := elevarr[pt.index]
+				// bathy := bathyarr[pt.index]
+				crust := crustarr[pt.index]
+
+				// key := fmt.Sprintf("%d|%d|%d|%d", lc, elev, bathy, crust)
+
+				var biome string
+				if elev > 92 {
+					biome = "Forest Hills"
+				} else {
+					biome = "Forest"
+				}
+
+				// if col, ok := memo[key]; ok {
+				// 	col.xz = pt.xz
+				// 	out <- col
+				// 	continue
+				// }
 				blocks := make([]string, elev)
 				for y := int16(0); y < elev; y++ {
 					if y == 0 {
@@ -302,7 +350,51 @@ func (r *Region) processFeatures(in chan Feature, out chan Column, i int) {
 					}
 				}
 				col := makeColumn(pt.xz, biome, blocks)
-				memo[key] = col
+				// memo[key] = col
+				out <- col
+			}
+		default:
+			// anything else
+			for _, pt := range pts {
+				elev := elevarr[pt.index]
+				// bathy := bathyarr[pt.index]
+				crust := crustarr[pt.index]
+
+				// key := fmt.Sprintf("%d|%d|%d|%d", lc, elev, bathy, crust)
+
+				var biome string
+				if elev > 152 {
+					// Hills+ too
+					biome = "Extreme Hills M"
+				} else if elev > 92 {
+					// Hills+ too
+					biome = "Extreme Hills"
+				} else if elev > 92 {
+					biome = "Extreme Hills Edge"
+				} else {
+					// Sunflower Plains?
+					biome = "Plains"
+				}
+
+				// if col, ok := memo[key]; ok {
+				// 	col.xz = pt.xz
+				// 	out <- col
+				// 	continue
+				// }
+				blocks := make([]string, elev)
+				for y := int16(0); y < elev; y++ {
+					if y == 0 {
+						blocks[y] = "Bedrock"
+					} else if y < (elev - crust - 1) {
+						blocks[y] = "Stone"
+					} else if y < elev-1 {
+						blocks[y] = "Dirt"
+					} else {
+						blocks[y] = "Grass Block"
+					}
+				}
+				col := makeColumn(pt.xz, biome, blocks)
+				// memo[key] = col
 				out <- col
 			}
 		}
