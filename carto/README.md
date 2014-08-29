@@ -22,6 +22,8 @@ coordinates by their transform values.
 
 ## Performance
 
+### OpenCL
+
 I have parallelized the code that checks what points are in the shape, but that doesn't really help.  The next step is OpenCL.
 
 https://github.com/pseudomind/go-opencl actually works pretty well on nala now that I nuked the drivers. :-P
@@ -53,10 +55,29 @@ Maybe sort by largest envelope and do those points first, skipping over the ones
 
 Someone else must have done this already!
 
-### New idea
+New idea!
 
 Inputs: bounding box, number of edges, array of edges, array for output (maximum size of bounding box)
 Outputs: length used, array for output
+
+### GDAL Warp API support
+
+Right now there is no support for the warp API.  When there is...
+
+		// build a GDALWarpOptions object
+		// eResampleAlg is "cubic"
+		// eWorkingDataType is "GDT_Unknown"
+		// hDstDS a memory dataset
+		// hSrcDS vrts["elevation"]
+		// nBandCount int 0
+		// padfDstNoDataImag NULL
+		// padfDstNoDataReal -340282346638529993179660072199368212480.000
+		// padfSrcNoDataImag NULL
+		// padfSrcNoDataReal 0
+		// papszWarpOptions []string
+		// SAMPLE_STEPS=31 // default 21
+		// SOURCE_EXTRA=maxdepth // for landcover instead of doing it by hand
+		// NUM_THREADS=ALL_CPUS
 
 ## When it all works right...
 
