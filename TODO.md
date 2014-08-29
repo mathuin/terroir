@@ -18,8 +18,8 @@ Development task list
   - [x] Biome map: deep ocean
   - [x] Import elevation data into map
   - [x] Biome map: Hills and Extreme hills
-- [ ] Translate biome and other maps into Minecraft world
-  - [ ] One goroutine per chunk?  column?  region?  world?
+- [x] Translate biome and other maps into Minecraft world
+  - [x] One goroutine per chunk?  column?  region?  world?
 - [ ] Build Docker container for project
 - [ ] Integration tests -- known input, known outputs
 
@@ -35,5 +35,6 @@ Future
   - [ ] What else?
 - [ ] Reuse world package as terrain generator for other servers
 - [ ] Use bathymetric data instead of guesses
+- [ ] Use canopy and impervious surface data instead of guesses
 - [ ] Use transportation data (railway network?  road?)
 - [ ] Villages in developed lands
