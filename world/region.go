@@ -120,5 +120,5 @@ func (w *World) writeRegions() error {
 }
 
 func (w World) regionFilename(rXZ XZ) string {
-	return path.Join(w.SaveDir, w.Name, "region", fmt.Sprintf("r.%d.%d.mca", rXZ.Z, rXZ.Z))
+	return path.Join(w.SaveDir, w.Name, "region", fmt.Sprintf("r.%d.%d.mca", rXZ.X, rXZ.Z))
 }
