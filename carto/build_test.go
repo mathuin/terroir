@@ -1,6 +1,8 @@
 package carto
 
 import (
+	"io/ioutil"
+	"os"
 	"testing"
 
 	"github.com/mathuin/terroir/world"
@@ -16,24 +18,29 @@ var buildWorld_tests = []struct {
 }
 
 func Test_BuildWorld(t *testing.T) {
+	td, nerr := ioutil.TempDir("", "")
+	if nerr != nil {
+		panic(nerr)
+	}
+	defer os.RemoveAll(td)
+
 	for _, tt := range buildWorld_tests {
 		r := MakeRegion(tt.name, tt.ll, tt.elname, tt.lcname)
-		// Debug = true
 		r.BuildMap()
-		// Debug = false
-		// Debug = true
 		w, err := r.BuildWorld()
 		if err != nil {
 			t.Fail()
 		}
-		// Debug = false
 
-		w.SetSaveDir("/tmp")
-		w.Write()
+		w.SetSaveDir(td)
+		werr := w.Write()
+		if werr != nil {
+			panic(werr)
+		}
 
-		nw, nwerr := world.ReadWorld("/tmp", tt.name, false)
+		nw, nwerr := world.ReadWorld(td, tt.name, true)
 		if nwerr != nil {
-			t.Fail()
+			panic(nwerr)
 		}
 		_ = nw
 	}
