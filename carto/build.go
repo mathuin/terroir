@@ -13,12 +13,13 @@ import (
 
 // JMT: convert to XZ, biome value, and list 0->n of points
 type Column struct {
-	xz     world.XZ
-	biome  int           // was string
-	blocks []world.Block // []string
+	xz      world.XZ
+	biome   int
+	blocks  []world.Block
+	okspawn bool
 }
 
-func makeColumn(xz world.XZ, biome string, blocks []string) Column {
+func makeColumn(xz world.XZ, biome string, blocks []string, okspawn bool) Column {
 	bval, ok := world.Biome[biome]
 	if !ok {
 		log.Panicf("%s not found in world.Biome", biome)
@@ -31,7 +32,7 @@ func makeColumn(xz world.XZ, biome string, blocks []string) Column {
 		}
 		bvals[i] = *bval
 	}
-	return Column{xz: xz, biome: bval, blocks: bvals}
+	return Column{xz: xz, biome: bval, blocks: bvals, okspawn: okspawn}
 }
 
 func (r Region) genFeatures(in chan Feature) {
@@ -131,7 +132,7 @@ func (r *Region) BuildWorld() (*world.World, error) {
 			w.SetBlock(pt, v)
 		}
 
-		if pt.Y > spawnpt.Y {
+		if column.okspawn && pt.Y > spawnpt.Y {
 			if Debug {
 				log.Printf("new spawn: %s", pt)
 			}
@@ -147,22 +148,15 @@ func (r *Region) BuildWorld() (*world.World, error) {
 	return &w, nil
 }
 
-var Arrind2Debug = false
+var ArrindDebug = false
 
-func arrind2(x int32, y int32, inx int32, iny int32, gti [6]int32) (int32, error) {
-	if Arrind2Debug {
-		log.Printf("x: %d, y: %d, inx: %d", x, y, inx)
-		log.Printf("0: %d, 1: %d, 2: %d, 3: %d, 4: %d, 5: %d",
-			gti[0], gti[1], gti[2], gti[3], gti[4], gti[5])
-		log.Printf("x-0: %d, y-3: %d", x-gti[0], y-gti[3])
-		log.Printf("x-0/1: %d, y-3/5: %d", (x-gti[0])/gti[1], (y-gti[3])/gti[5])
-	}
+func arrind(x int32, y int32, inx int32, iny int32, gti [6]int32) (int32, error) {
 	realx := (x - gti[0]) / gti[1]
 	if realx < 0 {
 		return 0, fmt.Errorf("realx %d < 0", realx)
 	}
 	if realx > inx {
-		return 0, fmt.Errorf("realx %d >= inx %d", realx, inx)
+		return 0, fmt.Errorf("realx %d > inx %d", realx, inx)
 	}
 	realy := (y-gti[3])/gti[5] - 1
 	if realy < 0 {
@@ -269,7 +263,8 @@ func (r *Region) processFeatures(in chan Feature, out chan Column, i int) {
 						blocks[y] = "Water"
 					}
 				}
-				col := makeColumn(pt.xz, biome, blocks)
+				// water makes a bad spawn point
+				col := makeColumn(pt.xz, biome, blocks, false)
 				// memo[key] = col
 				out <- col
 			}
@@ -306,7 +301,7 @@ func (r *Region) processFeatures(in chan Feature, out chan Column, i int) {
 						blocks[y] = "Sand"
 					}
 				}
-				col := makeColumn(pt.xz, biome, blocks)
+				col := makeColumn(pt.xz, biome, blocks, true)
 				// memo[key] = col
 				out <- col
 			}
@@ -347,7 +342,10 @@ func (r *Region) processFeatures(in chan Feature, out chan Column, i int) {
 						blocks[y] = "Grass Block"
 					}
 				}
-				col := makeColumn(pt.xz, biome, blocks)
+				// here's where we add the occasional tree sapling
+				// if we place one, set okspawn to false
+				okspawn := true
+				col := makeColumn(pt.xz, biome, blocks, okspawn)
 				// memo[key] = col
 				out <- col
 			}
@@ -386,7 +384,10 @@ func (r *Region) processFeatures(in chan Feature, out chan Column, i int) {
 						blocks[y] = "Grass Block"
 					}
 				}
-				col := makeColumn(pt.xz, biome, blocks)
+				// here's where we add the occasional tree sapling
+				// if we place one, set okspawn to false
+				okspawn := true
+				col := makeColumn(pt.xz, biome, blocks, okspawn)
 				// memo[key] = col
 				out <- col
 			}
@@ -430,7 +431,10 @@ func (r *Region) processFeatures(in chan Feature, out chan Column, i int) {
 						blocks[y] = "Grass Block"
 					}
 				}
-				col := makeColumn(pt.xz, biome, blocks)
+				// set okspawn to false if top block is not "ground"
+				// (i.e., if we put grass here)
+				okspawn := true
+				col := makeColumn(pt.xz, biome, blocks, okspawn)
 				// memo[key] = col
 				out <- col
 			}
@@ -440,11 +444,6 @@ func (r *Region) processFeatures(in chan Feature, out chan Column, i int) {
 
 type Feature struct {
 	gdal.Feature
-}
-
-// returns true if the feature is valid
-func (f Feature) isValid() bool {
-	return f.Geometry().IsValid()
 }
 
 // returns the landcover value
@@ -535,7 +534,7 @@ func (f Feature) processPoints(in chan world.XZ, out chan XZIndex, inx int, iny 
 	lc := f.LCValue()
 
 	for xz := range in {
-		index, aerr := arrind2(xz.X, xz.Z, int32(inx), int32(iny), gti)
+		index, aerr := arrind(xz.X, xz.Z, int32(inx), int32(iny), gti)
 		// JMT: arrind returns nil if coordinates are invalid
 		if aerr != nil {
 			log.Printf("%s: aerr was not nil: %s", ppHead, aerr.Error())

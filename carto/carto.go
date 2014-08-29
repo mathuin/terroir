@@ -374,55 +374,28 @@ func regionInfo(gt [6]float64, extents Extents) {
 
 type RasterInfo struct {
 	datatype string
-	min      float64
-	max      float64
-}
-
-func (ri RasterInfo) String() string {
-	return fmt.Sprintf("%s (%f, %f)", ri.datatype, ri.min, ri.max)
-}
-
-func datasetMinMaxes(ds gdal.Dataset) []RasterInfo {
-	bandCount := ds.RasterCount()
-	retval := make([]RasterInfo, bandCount)
-	for i := 0; i < bandCount; i++ {
-		rbi := i + 1
-		rb := ds.RasterBand(rbi)
-		rbdt := rb.RasterDataType().Name()
-		rbmin, minok := rb.GetMinimum()
-		rbmax, maxok := rb.GetMaximum()
-		if !minok || !maxok {
-			rbmin, rbmax = rb.ComputeMinMax(0)
-		}
-		retval[i] = RasterInfo{datatype: rbdt, min: rbmin, max: rbmax}
-	}
-	return retval
-}
-
-type RasterHInfo struct {
-	datatype string
 	buckets  map[int]int
 }
 
-func (rhi RasterHInfo) String() string {
-	retval := fmt.Sprintf("%s: ", rhi.datatype)
-	bucketlist := make([]string, len(rhi.buckets))
+func (ri RasterInfo) String() string {
+	retval := fmt.Sprintf("%s: ", ri.datatype)
+	bucketlist := make([]string, len(ri.buckets))
 
 	var keys []int
-	for k, _ := range rhi.buckets {
+	for k, _ := range ri.buckets {
 		keys = append(keys, k)
 	}
 	sort.Ints(keys)
 	for i, k := range keys {
-		bucketlist[i] = fmt.Sprintf("%d: %d", k, rhi.buckets[k])
+		bucketlist[i] = fmt.Sprintf("%d: %d", k, ri.buckets[k])
 	}
 	retval += strings.Join(bucketlist, ", ")
 	return retval
 }
 
-func datasetHistograms(ds gdal.Dataset) []RasterHInfo {
+func datasetHistograms(ds gdal.Dataset) []RasterInfo {
 	bandCount := ds.RasterCount()
-	retval := make([]RasterHInfo, bandCount)
+	retval := make([]RasterInfo, bandCount)
 	for i := 0; i < bandCount; i++ {
 		rbi := i + 1
 		rb := ds.RasterBand(rbi)
@@ -441,7 +414,7 @@ func datasetHistograms(ds gdal.Dataset) []RasterHInfo {
 		for _, v := range rball {
 			rbh[int(v)]++
 		}
-		retval[i] = RasterHInfo{datatype: rbdt, buckets: rbh}
+		retval[i] = RasterInfo{datatype: rbdt, buckets: rbh}
 	}
 	return retval
 }

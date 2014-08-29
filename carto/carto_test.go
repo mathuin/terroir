@@ -12,14 +12,14 @@ var buildMap_tests = []struct {
 	elname string
 	lcname string
 	ll     FloatExtents
-	histos []RasterHInfo
+	histos []RasterInfo
 }{
 	{
 		"BlockIsland", "elevation.tif", "landcover.tif",
 		FloatExtents{-71.575, -71.576, 41.189, 41.191},
-		[]RasterHInfo{
+		[]RasterInfo{
 			// landcover
-			RasterHInfo{"Int16", map[int]int{
+			RasterInfo{"Int16", map[int]int{
 				11: 49727,
 				21: 1987,
 				22: 734,
@@ -32,13 +32,13 @@ var buildMap_tests = []struct {
 				95: 342,
 			}},
 			// elevation
-			RasterHInfo{"Int16", map[int]int{
+			RasterInfo{"Int16", map[int]int{
 				62: 63631,
 				63: 1860,
 				64: 45,
 			}},
 			// bathy
-			RasterHInfo{"Int16", map[int]int{
+			RasterInfo{"Int16", map[int]int{
 				0:  15809,
 				1:  916,
 				2:  729,
@@ -72,7 +72,7 @@ var buildMap_tests = []struct {
 				30: 30118,
 			}},
 			// crust -- may change
-			RasterHInfo{"Int16", map[int]int{
+			RasterInfo{"Int16", map[int]int{
 				1: 13163,
 				2: 39217,
 				3: 12367,
