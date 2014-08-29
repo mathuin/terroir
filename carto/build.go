@@ -351,6 +351,45 @@ func (r *Region) processFeatures(in chan Feature, out chan Column, i int) {
 				// memo[key] = col
 				out <- col
 			}
+		case 90:
+			fallthrough
+		case 95:
+			// "swampland"
+			for _, pt := range pts {
+				elev := elevarr[pt.index]
+				// bathy := bathyarr[pt.index]
+				crust := crustarr[pt.index]
+
+				// key := fmt.Sprintf("%d|%d|%d|%d", lc, elev, bathy, crust)
+
+				var biome string
+				if elev > 92 {
+					biome = "Swampland M"
+				} else {
+					biome = "Swampland"
+				}
+
+				// if col, ok := memo[key]; ok {
+				// 	col.xz = pt.xz
+				// 	out <- col
+				// 	continue
+				// }
+				blocks := make([]string, elev)
+				for y := int16(0); y < elev; y++ {
+					if y == 0 {
+						blocks[y] = "Bedrock"
+					} else if y < (elev - crust - 1) {
+						blocks[y] = "Stone"
+					} else if y < elev-1 {
+						blocks[y] = "Dirt"
+					} else {
+						blocks[y] = "Grass Block"
+					}
+				}
+				col := makeColumn(pt.xz, biome, blocks)
+				// memo[key] = col
+				out <- col
+			}
 		default:
 			// anything else
 			for _, pt := range pts {
@@ -364,7 +403,7 @@ func (r *Region) processFeatures(in chan Feature, out chan Column, i int) {
 				if elev > 152 {
 					// Hills+ too
 					biome = "Extreme Hills M"
-				} else if elev > 92 {
+				} else if elev > 122 {
 					// Hills+ too
 					biome = "Extreme Hills"
 				} else if elev > 92 {
