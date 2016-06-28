@@ -6,7 +6,7 @@ import (
 	"runtime"
 	"sync"
 
-	"code.google.com/p/biogo.store/kdtree"
+	"github.com/biogo/store/kdtree"
 )
 
 var Debug = false
