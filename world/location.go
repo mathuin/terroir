@@ -14,13 +14,13 @@ type Location struct {
 
 func MakeLocation(X float64, Y float64, Z float64) Location {
 	if Debug {
-		log.Printf("MAKE LOCATION: %d, %d, %d", X, Y, Z)
+		log.Printf("MAKE LOCATION: %f, %f, %f", X, Y, Z)
 	}
 	return Location{X: X, Y: Y, Z: Z}
 }
 
 func (l Location) String() string {
-	return fmt.Sprintf("Location{X: %d, Y: %d, Z: %d}", l.X, l.Y, l.Z)
+	return fmt.Sprintf("Location{X: %f, Y: %f, Z: %f}", l.X, l.Y, l.Z)
 }
 
 func (l Location) ToPoint() Point {

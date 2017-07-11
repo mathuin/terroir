@@ -649,5 +649,4 @@ func (t Tag) Write(w io.Writer) error {
 			return fmt.Errorf("unknown tag")
 		}
 	}
-	return nil
 }

@@ -70,22 +70,22 @@ func (c Chunk) write() nbt.Tag {
 	}
 
 	var levelElems = []nbt.CompoundElem{
-		{"xPos", nbt.TAG_Int, c.xPos},
-		{"zPos", nbt.TAG_Int, c.zPos},
-		{"LastUpdate", nbt.TAG_Long, int64(0)},
-		{"LightPopulated", nbt.TAG_Byte, byte(0)},
-		{"TerrainPopulated", nbt.TAG_Byte, byte(1)},
-		{"V", nbt.TAG_Byte, byte(1)},
-		{"InhabitedTime", nbt.TAG_Long, int64(0)},
-		{"Biomes", nbt.TAG_Byte_Array, []byte(c.biomes)},
-		{"HeightMap", nbt.TAG_Int_Array, []int32(c.heightMap)},
-		{"Sections", nbt.TAG_List, sectionsPayload},
-		{"Entities", nbt.TAG_List, entitiesPayload},
-		{"TileEntities", nbt.TAG_List, tileEntitiesPayload},
+		{Key: "xPos", Tag: nbt.TAG_Int, Value: c.xPos},
+		{Key: "zPos", Tag: nbt.TAG_Int, Value: c.zPos},
+		{Key: "LastUpdate", Tag: nbt.TAG_Long, Value: int64(0)},
+		{Key: "LightPopulated", Tag: nbt.TAG_Byte, Value: byte(0)},
+		{Key: "TerrainPopulated", Tag: nbt.TAG_Byte, Value: byte(1)},
+		{Key: "V", Tag: nbt.TAG_Byte, Value: byte(1)},
+		{Key: "InhabitedTime", Tag: nbt.TAG_Long, Value: int64(0)},
+		{Key: "Biomes", Tag: nbt.TAG_Byte_Array, Value: []byte(c.biomes)},
+		{Key: "HeightMap", Tag: nbt.TAG_Int_Array, Value: []int32(c.heightMap)},
+		{Key: "Sections", Tag: nbt.TAG_List, Value: sectionsPayload},
+		{Key: "Entities", Tag: nbt.TAG_List, Value: entitiesPayload},
+		{Key: "TileEntities", Tag: nbt.TAG_List, Value: tileEntitiesPayload},
 	}
 
 	if len(c.tileTicks) > 0 {
-		tickElem := nbt.CompoundElem{"TileTicks", nbt.TAG_List, tileTicksPayload}
+		tickElem := nbt.CompoundElem{Key: "TileTicks", Tag: nbt.TAG_List, Value: tileTicksPayload}
 		levelElems = append(levelElems, tickElem)
 	}
 

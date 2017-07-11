@@ -33,12 +33,12 @@ func (s Section) String() string {
 
 func (s Section) write(y int) []nbt.Tag {
 	sElems := []nbt.CompoundElem{
-		{"Y", nbt.TAG_Byte, byte(y)},
-		{"Blocks", nbt.TAG_Byte_Array, s.Blocks},
-		{"Add", nbt.TAG_Byte_Array, s.Add},
-		{"Data", nbt.TAG_Byte_Array, s.Data},
-		{"BlockLight", nbt.TAG_Byte_Array, s.BlockLight},
-		{"SkyLight", nbt.TAG_Byte_Array, s.SkyLight},
+		{Key: "Y", Tag: nbt.TAG_Byte, Value: byte(y)},
+		{Key: "Blocks", Tag: nbt.TAG_Byte_Array, Value: s.Blocks},
+		{Key: "Add", Tag: nbt.TAG_Byte_Array, Value: s.Add},
+		{Key: "Data", Tag: nbt.TAG_Byte_Array, Value: s.Data},
+		{Key: "BlockLight", Tag: nbt.TAG_Byte_Array, Value: s.BlockLight},
+		{Key: "SkyLight", Tag: nbt.TAG_Byte_Array, Value: s.SkyLight},
 	}
 
 	sTagPayload := nbt.MakeCompoundPayload(sElems)

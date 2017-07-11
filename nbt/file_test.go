@@ -3,8 +3,9 @@ package nbt
 import (
 	"io/ioutil"
 	"os"
-	"reflect"
 	"testing"
+
+	"github.com/kylelemons/godebug/pretty"
 )
 
 var uncompressed_tests = []struct {
@@ -20,8 +21,8 @@ func Test_ReadUncompressedFile(t *testing.T) {
 		if err != nil {
 			t.Fail()
 		}
-		if !reflect.DeepEqual(readtags, tt.tag) {
-			t.Errorf("Given %+#v, wanted %+#v, got %+#v", tt.tag, tt.file, readtags)
+		if diff := pretty.Compare(tt.tag, readtags); diff != "" {
+			t.Errorf("%s: (-got +want)\n%s", tt.file, diff)
 		}
 	}
 }
@@ -42,8 +43,8 @@ func Test_WriteUncompressedFile(t *testing.T) {
 		if err != nil {
 			t.Fail()
 		}
-		if !reflect.DeepEqual(readtags, tt.tag) {
-			t.Errorf("Given %+#v, wanted %+#v, got %+#v", tt.file, tt.tag, readtags)
+		if diff := pretty.Compare(tt.tag, readtags); diff != "" {
+			t.Errorf("%s: (-got +want)\n%s", tt.file, diff)
 		}
 	}
 }
@@ -61,8 +62,8 @@ func Test_ReadCompressedFile(t *testing.T) {
 		if err != nil {
 			t.Fail()
 		}
-		if !reflect.DeepEqual(readtags, tt.tag) {
-			t.Errorf("Given %+#v, wanted %+#v, got %+#v", tt.tag, tt.file, readtags)
+		if diff := pretty.Compare(tt.tag, readtags); diff != "" {
+			t.Errorf("%s: (-got +want)\n%s", tt.file, diff)
 		}
 	}
 }
@@ -83,8 +84,8 @@ func Test_WriteCompressedFile(t *testing.T) {
 		if err != nil {
 			t.Fail()
 		}
-		if !reflect.DeepEqual(readtags, tt.tag) {
-			t.Errorf("Given %+#v, wanted %+#v, got %+#v", tt.file, tt.tag, readtags)
+		if diff := pretty.Compare(tt.tag, readtags); diff != "" {
+			t.Errorf("%s: (-got +want)\n%s", tt.file, diff)
 		}
 	}
 }

@@ -3,7 +3,7 @@ package nbt
 import (
 	"bytes"
 	"compress/zlib"
-	"reflect"
+	"github.com/kylelemons/godebug/pretty"
 	"testing"
 )
 
@@ -45,8 +45,8 @@ func Test_ReadTag(t *testing.T) {
 		if err != nil {
 			t.Fail()
 		}
-		if !reflect.DeepEqual(readtags, tt.input) {
-			t.Errorf("Given %+#v, wanted %+#v, got %+#v", tt.output, tt.input, readtags)
+		if diff := pretty.Compare(readtags, tt.input); diff != "" {
+			t.Errorf("Given %+#v: (-got +want)\n%s", tt.output, diff)
 		}
 	}
 }

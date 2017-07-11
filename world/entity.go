@@ -92,12 +92,12 @@ func (t TileTick) String() string {
 
 func (tt TileTick) write() nbt.Tag {
 	ttElems := []nbt.CompoundElem{
-		{"i", nbt.TAG_Int, tt.id},
-		{"t", nbt.TAG_Int, tt.time},
-		{"p", nbt.TAG_Int, tt.order},
-		{"x", nbt.TAG_Int, tt.point.X},
-		{"y", nbt.TAG_Int, tt.point.Y},
-		{"z", nbt.TAG_Int, tt.point.Z},
+		{Key: "i", Tag: nbt.TAG_Int, Value: tt.id},
+		{Key: "t", Tag: nbt.TAG_Int, Value: tt.time},
+		{Key: "p", Tag: nbt.TAG_Int, Value: tt.order},
+		{Key: "x", Tag: nbt.TAG_Int, Value: tt.point.X},
+		{Key: "y", Tag: nbt.TAG_Int, Value: tt.point.Y},
+		{Key: "z", Tag: nbt.TAG_Int, Value: tt.point.Z},
 	}
 
 	ttTag := nbt.MakeCompound("", ttElems)
@@ -122,7 +122,7 @@ func ReadTileTick(tarr []nbt.Tag) TileTick {
 		case "z":
 			tt.point.Z = tval.Payload.(int32)
 		default:
-			log.Fatalf("tag name %s not required for tiletick")
+			log.Fatalf("tag name %s not required for tiletick", tval.Name)
 		}
 	}
 	// JMT: no check for incomplete tileticks
