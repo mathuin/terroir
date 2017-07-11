@@ -3,7 +3,7 @@ package carto
 import (
 	"math/rand"
 
-	"github.com/mathuin/terroir/idt"
+	"github.com/mathuin/terroir/pkg/idt"
 )
 
 func (r Region) crust(rXsize int, rYsize int) []int16 {

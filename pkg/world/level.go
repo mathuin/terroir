@@ -8,7 +8,7 @@ import (
 	"os"
 	"path"
 
-	"github.com/mathuin/terroir/nbt"
+	"github.com/mathuin/terroir/pkg/nbt"
 )
 
 func (w World) level() (t nbt.Tag, err error) {

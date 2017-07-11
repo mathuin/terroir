@@ -5,7 +5,7 @@ import (
 	"os"
 	"testing"
 
-	"github.com/mathuin/terroir/world"
+	"github.com/mathuin/terroir/pkg/world"
 )
 
 var buildWorld_tests = []struct {

@@ -1,0 +1,31 @@
+{
+	"comment": "",
+	"ignore": "test",
+	"package": [
+		{
+			"checksumSHA1": "XkPbGbcIaOelsYwDUdZOfxDvECY=",
+			"path": "github.com/airbusgeo/gdal",
+			"revision": "afd7b6eb1d271af49a2aa9d77c682ebf3ea036d0",
+			"revisionTime": "2017-06-02T06:52:17Z"
+		},
+		{
+			"checksumSHA1": "5f/YZKAMw8R0/QLd6zkQT8c/EuI=",
+			"path": "github.com/biogo/store/kdtree",
+			"revision": "913427a1d5e89604e50ea1db0f28f34966d61602",
+			"revisionTime": "2016-05-05T13:47:55Z"
+		},
+		{
+			"checksumSHA1": "0xjvz/KGzXhAFsnDRvzofE0xNzI=",
+			"path": "github.com/kylelemons/godebug/diff",
+			"revision": "a616ab194758ae0a11290d87ca46ee8c440117b0",
+			"revisionTime": "2017-02-24T01:00:52Z"
+		},
+		{
+			"checksumSHA1": "ED154c1vFO2UMbFwdOZZ9KdfAzw=",
+			"path": "github.com/kylelemons/godebug/pretty",
+			"revision": "a616ab194758ae0a11290d87ca46ee8c440117b0",
+			"revisionTime": "2017-02-24T01:00:52Z"
+		}
+	],
+	"rootPath": "github.com/mathuin/terroir"
+}

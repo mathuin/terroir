@@ -7,8 +7,8 @@ import (
 
 	"sync"
 
-	"github.com/mathuin/gdal"
-	"github.com/mathuin/terroir/world"
+	"github.com/airbusgeo/gdal"
+	"github.com/mathuin/terroir/pkg/world"
 )
 
 // JMT: convert to XZ, biome value, and list 0->n of points

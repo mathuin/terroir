@@ -12,7 +12,7 @@ import (
 	"regexp"
 	"strconv"
 
-	"github.com/mathuin/terroir/nbt"
+	"github.com/mathuin/terroir/pkg/nbt"
 )
 
 var Debug = false

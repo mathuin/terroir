@@ -5,7 +5,7 @@ import (
 	"log"
 	"math"
 
-	"github.com/mathuin/gdal"
+	"github.com/airbusgeo/gdal"
 )
 
 // Extents are arrays of four values:

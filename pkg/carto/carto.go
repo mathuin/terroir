@@ -11,8 +11,8 @@ import (
 	"sort"
 	"strings"
 
-	"github.com/mathuin/gdal"
-	"github.com/mathuin/terroir/idt"
+	"github.com/airbusgeo/gdal"
+	"github.com/mathuin/terroir/pkg/idt"
 )
 
 var Debug = false

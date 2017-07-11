@@ -4,7 +4,7 @@ import (
 	"testing"
 
 	"github.com/kylelemons/godebug/pretty"
-	"github.com/mathuin/gdal"
+	"github.com/airbusgeo/gdal"
 )
 
 var buildMap_tests = []struct {

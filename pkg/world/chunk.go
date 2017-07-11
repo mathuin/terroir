@@ -13,7 +13,7 @@ import (
 	"os"
 	"time"
 
-	"github.com/mathuin/terroir/nbt"
+	"github.com/mathuin/terroir/pkg/nbt"
 )
 
 type Chunk struct {

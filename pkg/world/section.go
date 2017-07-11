@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"log"
 
-	"github.com/mathuin/terroir/nbt"
+	"github.com/mathuin/terroir/pkg/nbt"
 )
 
 type Section struct {
