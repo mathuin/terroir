@@ -1,6 +1,9 @@
 package carto
 
-import "testing"
+import (
+	"math"
+	"testing"
+)
 
 var generateExtents_tests = []struct {
 	ll     FloatExtents
@@ -19,6 +22,8 @@ var generateExtents_tests = []struct {
 	},
 }
 
+var epsilon = 1e-10
+
 func Test_generateExtents(t *testing.T) {
 	for _, tt := range generateExtents_tests {
 		r := MakeRegion("Pie", tt.ll, "", "")
@@ -34,7 +39,7 @@ func Test_generateExtents(t *testing.T) {
 		}
 		for maptype, subarr := range tt.wgs84 {
 			for coord, value := range subarr {
-				if r.wgs84[maptype][coord] != value {
+				if math.Abs(r.wgs84[maptype][coord]-value)/value > epsilon {
 					t.Errorf("wgs84 %s: given %+#v, expected %+#v, got %+#v", maptype, tt.ll, tt.wgs84[maptype], r.wgs84[maptype])
 					break
 				}
@@ -58,7 +63,7 @@ func Test_getCorners(t *testing.T) {
 	for _, tt := range getCorners_tests {
 		out := getCorners(tt.fromCS, tt.toCS, tt.in)
 		for i, v := range out {
-			if tt.out[i] != v {
+			if math.Abs(tt.out[i]-v)/v > epsilon {
 				t.Errorf("Given %s %s %v, wanted %+#v, got %+#v", tt.fromCS, tt.toCS, tt.in, tt.out, out)
 				break
 			}
