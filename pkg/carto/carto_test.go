@@ -3,8 +3,8 @@ package carto
 import (
 	"testing"
 
-	"github.com/kylelemons/godebug/pretty"
 	"github.com/airbusgeo/gdal"
+	"github.com/kylelemons/godebug/pretty"
 )
 
 var buildMap_tests = []struct {
