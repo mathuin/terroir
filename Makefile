@@ -54,7 +54,9 @@ endif
 
 IMAGE := $(REGISTRY)/$(BIN)-$(ARCH)
 
-BUILD_IMAGE ?= golang:1.7-alpine
+# JMT: This image only works for amd64
+# Other images required for other architectures
+BUILD_IMAGE ?= mathuin/terroir-build
 
 # If you want to build all binaries, see the 'all-build' rule.
 # If you want to build all containers, see the 'all-container' rule.

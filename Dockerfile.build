@@ -1,0 +1,28 @@
+FROM golang:1.8-stretch
+#         python-all-dev \
+RUN apt-get update && \
+    apt-get -y upgrade && \
+    apt-get -y install \
+        build-essential \
+        gdal-bin \
+        libgdal-dev \
+        && \
+    apt-get clean
+# ENV GDAL_VERSION 1.11.3
+# # --with-python && \
+# RUN curl http://download.osgeo.org/gdal/${GDAL_VERSION}/gdal-${GDAL_VERSION}.tar.gz | tar -xzf - && \
+#     (cd ./gdal-${GDAL_VERSION} && \
+#         ./configure --prefix=/usr && \
+#         make -j8 && \
+#         make install) && \
+#     rm -rf ./gdal-${GDAL_VERSION} && \
+#     apt-get -y autoremove && \
+#     apt-get clean && \
+#     apt-get autoclean && \
+#     rm -rf /var/lib/apt/lists/*
+# JMT Yes I am running as root for now
+# ENV GOPATH /root/go
+# JMT This is also probably a bad idea
+# RUN mkdir -p ${GOPATH}/src/github.com/terroir/mathuin/
+# ADD . ${GOPATH}/src/github.com/terroir/mathuin/
+# WORKDIR ${GOPATH}/src/github.com/terroir/mathuin/

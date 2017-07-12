@@ -1,4 +1,4 @@
-#!/bin/sh
+#!/bin/bash
 
 # Copyright 2016 The Kubernetes Authors.
 #
@@ -31,7 +31,7 @@ if [ -z "${VERSION}" ]; then
     exit 1
 fi
 
-export CGO_ENABLED=0
+# export CGO_ENABLED=0
 export GOARCH="${ARCH}"
 
 go install                                                         \
