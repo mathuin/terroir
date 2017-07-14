@@ -27,3 +27,10 @@ _testmain.go
 *~
 .vagrant
 *.tif.aux.xml
+
+# Build template
+/bin
+/.go
+/.push-*
+/.container-*
+/.dockerfile-*
