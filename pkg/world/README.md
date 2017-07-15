@@ -1,10 +1,22 @@
 # World notes
 
+## How to update to a new version of Minecraft
+
+Download the new server and start it with the GUI.  As soon as it finishes, type `stop` to stop the server, and save the world directory.  
+
+Run `nbt2yaml` or something similar against the `level.dat` file in the new directory and in the old directory.  Add or change any relevant entries to `level.go`.
+
+Replace the `world` directory in *this* directory with the new one, and run the tests.
+
+Everything *should* pass!
+
 ## Level files
 
 The only file really required for a directory to be a Minecraft level!
 
 ### Example
+
+This example is incomplete.
 
 ```
 TAG_Compound(u''): 1 entries
@@ -53,7 +65,7 @@ TAG_Compound(u''): 1 entries
 
 ### Coordinates
 
-Region files have names like "region/r.x.z.mcr" where x and z are
+Region files have names like "region/r.x.z.mca" where x and z are
 "region coordinates".  These coordinates can be found this way:
 
 ```
@@ -126,13 +138,16 @@ Note: uncompressed data is in NBT format, in chunk format(?)
 * "sections" list tag with (up to 16) compound tags
 * each section has 16x16x16 "Blocks", "Data", "SkyLight", "BlockLight" (chunk)
 * each section has "Y" byte tag 0 bottom 15 top
-* each section has optinoal "Add" tag, duplicate of "Data" (used to calculate blockid = (add << 8) + base)
+* each section has optional "Add" tag, duplicate of "Data" (used to calculate blockid = (add << 8) + base)
 * each chunk has 16x16 byte array "Biomes"
 * new format y z x ((y * 16 + z) * 16 + x)
 * ".mca" extension
 * "Heightmap" tag uses NBT Int Array.
 
 ### NBT Format
+
+This may be incomplete!
+
 Compound "": root tag
 * Compound "Level": chunk data
   * Int "xPos": X position of chunk
@@ -204,4 +219,3 @@ Many other things are not supported because they are currently outside the scope
 Check to see if a section is empty and just don't write it?
 
 Skip writing any air blocks at first?
-

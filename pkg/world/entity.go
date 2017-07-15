@@ -73,7 +73,7 @@ func (te TileEntity) write() []nbt.Tag {
 // TileTicks TAG_List of TAG_Compound
 // (unless none exist, in which case no tag is sent)
 type TileTick struct {
-	id    int32
+	id    string
 	time  int32
 	order int32
 	point Point
@@ -87,12 +87,12 @@ func MakeTileTick() TileTick {
 }
 
 func (t TileTick) String() string {
-	return fmt.Sprintf("TileTick{ID: %d, Time: %d, Order: %d, Point: %v}", t.id, t.time, t.order, t.point)
+	return fmt.Sprintf("TileTick{ID: %s, Time: %d, Order: %d, Point: %v}", t.id, t.time, t.order, t.point)
 }
 
 func (tt TileTick) write() nbt.Tag {
 	ttElems := []nbt.CompoundElem{
-		{Key: "i", Tag: nbt.TAG_Int, Value: tt.id},
+		{Key: "i", Tag: nbt.TAG_String, Value: tt.id},
 		{Key: "t", Tag: nbt.TAG_Int, Value: tt.time},
 		{Key: "p", Tag: nbt.TAG_Int, Value: tt.order},
 		{Key: "x", Tag: nbt.TAG_Int, Value: tt.point.X},
@@ -110,7 +110,7 @@ func ReadTileTick(tarr []nbt.Tag) TileTick {
 	for _, tval := range tarr {
 		switch tval.Name {
 		case "i":
-			tt.id = tval.Payload.(int32)
+			tt.id = tval.Payload.(string)
 		case "t":
 			tt.time = tval.Payload.(int32)
 		case "p":

@@ -57,6 +57,10 @@ func (t *Tag) SetPayload(newp interface{}) error {
 	if Debug {
 		log.Printf("SET PAYLOAD: type %s, name %#v, payload type %T", Names[t.Type], t.Name, newp)
 	}
+	if t.Type == TAG_List {
+		t.Payload = newp
+		return nil
+	}
 	switch newp.(type) {
 	case byte:
 		if t.Type == TAG_Byte {
