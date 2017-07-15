@@ -9,7 +9,6 @@ import (
 	"io"
 	"io/ioutil"
 	"log"
-	"math"
 	"os"
 	"time"
 
@@ -256,12 +255,13 @@ func WriteChunkToRegion(in chan Chunk, out chan CTROut, i int) {
 		}
 		zw.Close()
 
-		// - calculate lengths
-		// (the extra byte is the compression byte)
+		// Calculate padding.
+		// Chunks are written in multiples of 4096 bytes.
+		// The four length bytes are included in this count.
 		ccl := int32(zb.Len() + 1)
-		cout.count = int32(math.Ceil(float64(ccl) / 4096.0))
-		pad := int32(4096*cout.count) - ccl - 4
+		pad := 4096 - (ccl+4)%4096
 		whole := int(ccl + pad + 4)
+		cout.count = int32(whole / 4096)
 
 		if Debug {
 			log.Printf("Length of compressed chunk: %d", ccl)

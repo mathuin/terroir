@@ -13,8 +13,8 @@ func main() {
 	log.Print("Begin!")
 
 	saveDir := "/worlds"
-	worldName := "TerroirTest"
-	newWorldName := "TerroirTwo"
+	worldName := "world"
+	newWorldName := "world2"
 
 	w, err := world.ReadWorld(saveDir, worldName, true)
 	if err != nil {

@@ -13,11 +13,11 @@ import (
 
 func Test_worldWriteRead(t *testing.T) {
 	saveDir := "."
-	worldName := "TerroirTest"
-	newWorldName := "TerroirTwo"
+	worldName := "world"
+	newWorldName := "world2"
 	rx := 0
 	rz := 0
-	expected_count := 1024
+	expected_count := 13
 
 	td, nerr := ioutil.TempDir("", "")
 	if nerr != nil {
@@ -75,8 +75,8 @@ func Test_FullReadWriteRead(t *testing.T) {
 		t.Skip("skipping test in short mode")
 	}
 	saveDir := "."
-	worldName := "TerroirTest"
-	newWorldName := "TerroirTwo"
+	worldName := "world"
+	newWorldName := "world2"
 
 	w, err := ReadWorld(saveDir, worldName, true)
 	if err != nil {

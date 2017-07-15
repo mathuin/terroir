@@ -1,4 +1,4 @@
-[![Build Status](https://drone.io/github.com/mathuin/terroir/status.png)](https://drone.io/github.com/mathuin/terroir/latest)
+[![Coverage Status](https://coveralls.io/repos/github/mathuin/terroir/badge.svg?branch=master)](https://coveralls.io/github/mathuin/terroir?branch=master)
 
 # Welcome to Terroir!
 
@@ -6,7 +6,7 @@ Terroir uses real data to generate Minecraft worlds which somewhat resemble actu
 
 ## Installation
 
-**TODO:** Install Docker, and fetch the pre-built image.
+This project uses the build process originally found in https://github.com/thockin/go-build-template which facilitates the construction and deployment of Docker containers.
 
 ## Requirements
 
